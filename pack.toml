@@ -1,0 +1,5 @@
+[custom.all.irw-core]
+type = "local"
+path = "core"
+ipkg = "irw-core.ipkg"
+test = "test/test.ipkg"
