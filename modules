@@ -174,7 +174,6 @@ TODO
   Libraries.Data.Graph
   Libraries.Data.IMaybe
   Libraries.Data.IntMap
-  Libraries.Data.IOMatrix
   Libraries.Data.List.Extra
   Libraries.Data.List.HasLength
   Libraries.Data.List.LengthMatch
@@ -320,3 +319,4 @@ Done
   Core.Name
   Core.Name.Namespace
   Libraries.Data.NameMap
+  Libraries.Data.IOMatrix

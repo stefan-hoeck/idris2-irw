@@ -9,6 +9,7 @@ modules =
           IRW.Core.Name
         , IRW.Core.Name.Namespace
 
+        , IRW.Libs.Data.Matrix1
         , IRW.Libs.Data.NameMap
         , IRW.Libs.Data.String.Extra
 
