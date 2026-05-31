@@ -18,6 +18,8 @@ modules =
         , IRW.Libs.Data.List.Thin
         , IRW.Libs.Data.NameMap
         , IRW.Libs.Data.NatSet
+        , IRW.Libs.Data.SnocList.SizeOf
+        , IRW.Libs.Data.SnocList.Thin
         , IRW.Libs.Data.String.Extra
         , IRW.Libs.Text.Distance.Levenshtein
 
