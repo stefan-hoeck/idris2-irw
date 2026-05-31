@@ -9,7 +9,10 @@ import IRW.Libs.Text.Distance.Levenshtein
 %default total
 
 str : Gen String
-str = string (linear 0 10) unicode
+str = string (linear 0 30) unicode
+
+shortStr : Gen String
+shortStr = string (linear 0 10) unicode
 
 cost : Char -> Char -> Nat
 cost c d =
@@ -38,10 +41,16 @@ prop_self =
     s <- forAll str
     compute s s === 0
 
+prop_sym : Property
+prop_sym =
+  property $ Prelude.do
+    [s1,s2] <- forAll $ hlist [str,str]
+    compute s1 s2 === compute s2 s1
+
 prop_spec : Property
 prop_spec =
   property $ Prelude.do
-    [s1,s2] <- forAll $ hlist [str,str]
+    [s1,s2] <- forAll $ hlist [shortStr,shortStr]
     compute s1 s2 === spec s1 s2
 
 export
@@ -49,5 +58,6 @@ props : Group
 props =
   MkGroup "IRW.Libs.Text.Distance.Levenshtein"
     [ ("prop_self", prop_self)
+    , ("prop_sym",  prop_sym)
     , ("prop_spec", prop_spec)
     ]
