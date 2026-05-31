@@ -1,10 +1,11 @@
 module IRW.Core.Name
 
-import Data.Maybe
-import IRW.Libs.Data.String.Extra
+import Data.Maybe0 as M0
+import Data.SnocList
+import Decidable.HDecEq
 import Derive.Prelude
-
--- import Libraries.Text.Distance.Levenshtein as Distance
+import IRW.Libs.Data.String.Extra
+import IRW.Libs.Text.Distance.Levenshtein as D
 
 import public IRW.Core.Name.Namespace
 
@@ -256,32 +257,25 @@ Interpolation Name where
   interpolate (WithBlock outer i) = "with block in " ++ outer
   interpolate (Resolved x) = "$resolved\{x}"
 
--- TODO: Implement `HDecEq0` from refined
--- export
--- userNameEq : (x, y : UserName) -> Maybe (x = y)
--- userNameEq (Basic x) (Basic y) = L.maybeCong Basic (L.maybeEq x y)
--- userNameEq (Field x) (Field y) = L.maybeCong Field (L.maybeEq x y)
--- userNameEq Underscore Underscore = Just Refl
--- userNameEq _ _ = Nothing
--- 
--- export
--- nameEq : (x : Name) -> (y : Name) -> Maybe (x = y)
--- nameEq (NS xs x) (NS ys y) = L.maybeCong2 NS (L.maybeEq xs ys) (nameEq x y)
--- nameEq (UN x) (UN y) = L.maybeCong UN (userNameEq x y)
--- nameEq (MN x t) (MN x' t') = L.maybeCong2 MN (L.maybeEq x x') (L.maybeEq t t')
--- nameEq (PV x t) (PV y t') = L.maybeCong2 PV (nameEq x y) (L.maybeEq t t')
--- nameEq (DN x t) (DN y t') = L.maybeCong2 DN (L.maybeEq x y) (nameEq t t')
--- nameEq (Nested x y) (Nested x' y') = L.maybeCong2 Nested (L.maybeEq x x') (nameEq y y')
--- nameEq (CaseBlock x y) (CaseBlock x' y') = L.maybeCong2 CaseBlock (L.maybeEq x x') (L.maybeEq y y')
--- nameEq (WithBlock x y) (WithBlock x' y') = L.maybeCong2 WithBlock (L.maybeEq x x') (L.maybeEq y y')
--- nameEq (Resolved x) (Resolved y) = L.maybeCong Resolved (L.maybeEq x y)
--- nameEq _ _ = Nothing
+export
+HDecEq UserName where
+  hdecEq (Basic x)  (Basic y)  = M0.maybeCong Basic (hdecEq x y)
+  hdecEq (Field x)  (Field y)  = M0.maybeCong Field (hdecEq x y)
+  hdecEq Underscore Underscore = Just0 Refl
+  hdecEq _ _                   = Nothing0
 
--- export
--- namesEq : (xs, ys : List Name) -> Maybe (xs = ys)
--- namesEq [] [] = Just Refl
--- namesEq (x :: xs) (y :: ys) = L.maybeCong2 (::) (nameEq x y) (namesEq xs ys)
--- namesEq _ _ = Nothing
+export
+HDecEq Name where
+  hdecEq (NS xs x) (NS ys y) = M0.maybeCong2 NS (hdecEq xs ys) (hdecEq x y)
+  hdecEq (UN x) (UN y) = M0.maybeCong UN (hdecEq x y)
+  hdecEq (MN x t) (MN x' t') = M0.maybeCong2 MN (hdecEq x x') (hdecEq t t')
+  hdecEq (PV x t) (PV y t') = M0.maybeCong2 PV (hdecEq x y) (hdecEq t t')
+  hdecEq (DN x t) (DN y t') = M0.maybeCong2 DN (hdecEq x y) (hdecEq t t')
+  hdecEq (Nested x y) (Nested x' y') = M0.maybeCong2 Nested (hdecEq x x') (hdecEq y y')
+  hdecEq (CaseBlock x y) (CaseBlock x' y') = M0.maybeCong2 CaseBlock (hdecEq x x') (hdecEq y y')
+  hdecEq (WithBlock x y) (WithBlock x' y') = M0.maybeCong2 WithBlock (hdecEq x x') (hdecEq y y')
+  hdecEq (Resolved x) (Resolved y) = M0.maybeCong Resolved (hdecEq x y)
+  hdecEq _ _ = Nothing0
 
 ||| Generate the next machine name
 export
@@ -291,26 +285,27 @@ next (UN n) = MN (interpolate n) 0
 next (NS ns n) = NS ns (next n)
 next n = MN (interpolate n) 0
 
--- TODO: Levenstein distances
--- ||| levenstein distance that needs to be reached in order for a
--- ||| namespace path to closely match another one.
--- closeNamespaceDistance : Nat
--- closeNamespaceDistance = 3
--- 
--- ||| Check if two strings are close enough to be similar, using the namespace
--- ||| distance criteria.
--- closeDistance : String -> String -> IO Bool
--- closeDistance s1 s2 = pure (!(Distance.compute s1 s2) < closeNamespaceDistance)
--- 
--- ||| Check if the test closely match the reference.
--- ||| We only check for namespaces and user-defined names.
--- export
--- closeMatch : (test, reference : Name) -> IO Bool
--- closeMatch (NS pathTest nameTest) (NS pathRef nameRef)
---   = let extractNameString = toList . (map snd . isUN >=> isBasic)
---         unfoldedTest = unsafeUnfoldNamespace pathTest ++ extractNameString nameTest
---         unfoldedRef = unsafeUnfoldNamespace pathRef ++ extractNameString nameRef
---         tests : IO (List Nat) = traverse (uncurry Distance.compute) (zip unfoldedTest unfoldedRef)
---     in map ((<= closeNamespaceDistance) . sum) tests
--- closeMatch (UN (Basic test)) (UN (Basic ref)) = closeDistance test ref
--- closeMatch _ _ = pure False
+-- levenstein distance that needs to be reached in order for a
+-- namespace path to closely match another one.
+closeNamespaceDistance : Nat
+closeNamespaceDistance = 3
+
+-- Check if two strings are close enough to be similar, using the namespace
+-- distance criteria.
+closeDistance : String -> String -> Bool
+closeDistance s1 s2 = D.compute s1 s2 < closeNamespaceDistance
+
+basicString : Name -> SnocList String -> SnocList String
+basicString n sn = maybe sn (sn:<) (isUN n >>= isBasic . snd)
+
+||| Check if the test closely match the reference.
+||| We only check for namespaces and user-defined names.
+export
+closeMatch : (test, reference : Name) -> Bool
+closeMatch (NS pt nt) (NS pref nref) =
+ let unfoldedTest := basicString nt pt.names
+     unfoldedRef  := basicString nref pref.names
+     tests        := zipWith D.compute unfoldedTest unfoldedRef
+  in sum tests <= closeNamespaceDistance
+closeMatch (UN (Basic test)) (UN (Basic ref)) = closeDistance test ref
+closeMatch _ _ = False

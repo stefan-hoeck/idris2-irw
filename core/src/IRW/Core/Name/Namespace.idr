@@ -1,7 +1,8 @@
 module IRW.Core.Name.Namespace
 
 import Data.List
-import Decidable.Equality
+import Data.Maybe0 as M0
+import Decidable.HDecEq
 import Derive.Prelude
 import IRW.Libs.Data.String.Extra
 
@@ -55,7 +56,7 @@ mkNamespacedIdent s =
   case [<] <>< forget (split (== '.') s) of
     [<n]  => (Nothing, n)
     ns:<n => (Just $ MkNS ns, n)
-    [<]   => (Nothing, "") 
+    [<]   => (Nothing, "")
 
 export
 mkNestedNamespace : Maybe Namespace -> String -> Namespace
@@ -138,12 +139,9 @@ isInPathOf i (MkNS ns) = i `elem` ns
 -- INSTANCES
 -------------------------------------------------------------------------------------
 
-Injective MkNS where
-  injective Refl = Refl
-
 export
-DecEq Namespace where
-  decEq (MkNS ms) (MkNS ns) = decEqCong (decEq ms ns)
+HDecEq Namespace where
+  hdecEq (MkNS ms) (MkNS ns) = M0.maybeCong MkNS (hdecEq ms ns)
 
 export %inline
 showNSWithSep : String -> Namespace -> String
