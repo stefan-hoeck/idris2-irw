@@ -12,6 +12,7 @@ modules =
         , IRW.Core.Name.Namespace
         , IRW.Core.FC
 
+        , IRW.Libs.Data.List.SizeOf
         , IRW.Libs.Data.NameMap
         , IRW.Libs.Data.String.Extra
         , IRW.Libs.Text.Distance.Levenshtein

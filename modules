@@ -63,7 +63,6 @@ TODO
   Core.Coverage
   Core.Directory
   Core.Env
-  Core.FC
   Core.GetType
   Core.Hash
   Core.InitPrimitives
@@ -172,10 +171,8 @@ TODO
   Libraries.Data.IMaybe
   Libraries.Data.IntMap
   Libraries.Data.List.Extra
-  Libraries.Data.List.HasLength
   Libraries.Data.List.LengthMatch
   Libraries.Data.List.Quantifiers.Extra
-  Libraries.Data.List.SizeOf
   Libraries.Data.List.Thin
   Libraries.Data.List01
   Libraries.Data.List01.Quantifiers
@@ -313,9 +310,12 @@ TODO
 Done
   Core.Name
   Core.Name.Namespace
+  Core.FC
   Libraries.Control.ANSI                                   -- use lib ansi
   Libraries.Control.ANSI.CSI                               -- use lib ansi
   Libraries.Control.ANSI.SGR                               -- use lib ansi
+  Libraries.Data.List.HasLength                            -- moved as private utility to Libraries.Data.List.SizeOf
+  Libraries.Data.List.SizeOf
   Libraries.Data.NameMap
   Libraries.Data.IOMatrix                                  -- use lib array
   Libraries.Text.Bounded                                   -- use lib ilex-core
