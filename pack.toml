@@ -9,4 +9,6 @@ test = "test/test.ipkg"
 #------------------------------------------------------------
 
 [custom.all]
+algebra.commit         = "latest:main"
 array.commit           = "latest:main"
+refined.commit         = "latest:main"

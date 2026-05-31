@@ -6,10 +6,12 @@ depends = base
         , async
         , bytestring
         , ilex-core
+        , refined
 
 modules =
           IRW.Core.Name
         , IRW.Core.Name.Namespace
+        , IRW.Core.Name.Scoped
         , IRW.Core.FC
 
         , IRW.Libs.Data.List.SizeOf
