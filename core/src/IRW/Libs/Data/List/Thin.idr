@@ -7,6 +7,8 @@ import IRW.Libs.Data.NatSet
 -- TODO implement:
 -- Guillaume Allais: Builtin Types Viewed as Inductive Families
 -- https://doi.org/10.48550/arXiv.2301.02194
+||| Proof that the elements in the first list also appear
+||| in the second list in the same order.
 public export
 data Thin : List a -> List a -> Type where
   Refl : Thin xs xs
@@ -37,8 +39,6 @@ fromNatSet ns xs =
   where
     go : Nat -> (xs : List a) -> (xs' ** Thin xs' xs)
     go i [] = (_ ** Refl)
-    go i (x :: xs)
-        = let (xs' ** th) = go (S i) xs in
-              if i `elem` ns
-                 then (xs' ** Drop th)
-                 else (x :: xs' ** Keep th)
+    go i (x :: xs) =
+     let (xs' ** th) := go (S i) xs
+      in if i `elem` ns then (xs' ** Drop th) else (x :: xs' ** Keep th)
