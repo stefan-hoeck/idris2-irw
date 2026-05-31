@@ -2,8 +2,8 @@ module IRW.Libs.Text.Distance.Levenshtein
 
 import Data.Linear.Traverse1
 import Data.Array.Index
+import Data.Array.Mutable
 import Data.String
-import IRW.Libs.Data.Matrix1
 import Syntax.T1
 
 %default total
