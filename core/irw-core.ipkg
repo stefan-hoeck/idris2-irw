@@ -4,6 +4,7 @@ version = 0.1.0
 authors = "stefan-hoeck"
 depends = base
         , async
+        , bytestring
 
 modules =
           IRW.Core.Name
@@ -12,5 +13,6 @@ modules =
         , IRW.Libs.Data.Matrix1
         , IRW.Libs.Data.NameMap
         , IRW.Libs.Data.String.Extra
+        , IRW.Libs.Text.Distance.Levenshtein
 
 sourcedir = "src"
