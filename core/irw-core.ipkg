@@ -5,10 +5,12 @@ authors = "stefan-hoeck"
 depends = base
         , async
         , bytestring
+        , ilex-core
 
 modules =
           IRW.Core.Name
         , IRW.Core.Name.Namespace
+        , IRW.Core.FC
 
         , IRW.Libs.Data.NameMap
         , IRW.Libs.Data.String.Extra
