@@ -1,4 +1,12 @@
 module Main
 
+import Hedgehog
+import Test.Libs.Text.Distance.Levenshtein
+
+%default total
+
 main : IO ()
-main = putStrLn "Test successful!"
+main =
+  test
+    [ Levenshtein.props
+    ]

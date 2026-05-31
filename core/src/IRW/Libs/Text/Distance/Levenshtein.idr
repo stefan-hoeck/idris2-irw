@@ -8,36 +8,6 @@ import Syntax.T1
 
 %default total
 
--- TODO: This should go to idris2-array and replace the one from indexed-graph
-||| Generates the list of all `Fin n` in linear type.
-|||
-||| This is a lot faster than `Data.Fin.allFins`, which runs in quadratic
-||| time.
-export
-allFinsFast : (n : Nat) -> List (Fin n)
-allFinsFast 0 = []
-allFinsFast (S n) = go [] last
-  where
-    go : List (Fin $ S n) -> Fin (S n) -> List (Fin $ S n)
-    go xs FZ     = FZ :: xs
-    go xs (FS x) = go (FS x :: xs) (assert_smaller (FS x) $ weaken x)
-
--- Self-evidently correct but O(3 ^ (min mn)) complexity
--- TODO: this should be a test
-spec : String -> String -> Nat
-spec a b = loop (fastUnpack a) (fastUnpack b) where
-
-  loop : List Char -> List Char -> Nat
-  loop [] ys = length ys -- deletions
-  loop xs [] = length xs -- insertions
-  loop (x :: xs) (y :: ys)
-    = if x == y then loop xs ys -- match
-      else 1 + minimum
-           [ loop (x :: xs) ys -- insert y
-           , loop xs (y :: ys) -- delete x
-           , loop xs ys        -- substitute y for x
-           ]
-
 LenS : (s : String) -> Nat
 LenS s = cast $ strLength s
 
