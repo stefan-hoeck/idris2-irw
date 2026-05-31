@@ -3,3 +3,10 @@ type = "local"
 path = "core"
 ipkg = "irw-core.ipkg"
 test = "test/test.ipkg"
+
+#------------------------------------------------------------
+#   Custom Dependencies
+#------------------------------------------------------------
+
+[custom.all]
+array.commit           = "latest:main"
