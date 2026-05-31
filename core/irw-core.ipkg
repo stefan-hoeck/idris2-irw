@@ -14,6 +14,7 @@ modules =
 
         , IRW.Libs.Data.List.SizeOf
         , IRW.Libs.Data.NameMap
+        , IRW.Libs.Data.NatSet
         , IRW.Libs.Data.String.Extra
         , IRW.Libs.Text.Distance.Levenshtein
 

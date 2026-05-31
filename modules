@@ -177,7 +177,6 @@ TODO
   Libraries.Data.List01
   Libraries.Data.List01.Quantifiers
   Libraries.Data.NameMap.Traversable
-  Libraries.Data.NatSet
   Libraries.Data.Ordering.Extra
   Libraries.Data.PosMap
   Libraries.Data.Record
@@ -317,6 +316,7 @@ Done
   Libraries.Data.List.HasLength                            -- moved as private utility to Libraries.Data.List.SizeOf
   Libraries.Data.List.SizeOf
   Libraries.Data.NameMap
+  Libraries.Data.NatSet
   Libraries.Data.IOMatrix                                  -- use lib array
   Libraries.Text.Bounded                                   -- use lib ilex-core
   Libraries.Text.Distance.Levenshtein
