@@ -13,6 +13,7 @@ modules =
         , IRW.Core.FC
 
         , IRW.Libs.Data.List.SizeOf
+        , IRW.Libs.Data.List.Thin
         , IRW.Libs.Data.NameMap
         , IRW.Libs.Data.NatSet
         , IRW.Libs.Data.String.Extra

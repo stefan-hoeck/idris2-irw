@@ -173,7 +173,6 @@ TODO
   Libraries.Data.List.Extra
   Libraries.Data.List.LengthMatch
   Libraries.Data.List.Quantifiers.Extra
-  Libraries.Data.List.Thin
   Libraries.Data.List01
   Libraries.Data.List01.Quantifiers
   Libraries.Data.NameMap.Traversable
@@ -315,6 +314,7 @@ Done
   Libraries.Control.ANSI.SGR                               -- use lib ansi
   Libraries.Data.List.HasLength                            -- moved as private utility to Libraries.Data.List.SizeOf
   Libraries.Data.List.SizeOf
+  Libraries.Data.List.Thin
   Libraries.Data.NameMap
   Libraries.Data.NatSet
   Libraries.Data.IOMatrix                                  -- use lib array
