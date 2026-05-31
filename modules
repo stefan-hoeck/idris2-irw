@@ -163,9 +163,6 @@ TODO
   Idris.REPL.Opts
   Idris.REPL.FuzzySearch
 
-  Libraries.Control.ANSI
-  Libraries.Control.ANSI.CSI
-  Libraries.Control.ANSI.SGR
   Libraries.Control.Delayed
 
   Libraries.Data.ANameMap
@@ -210,7 +207,6 @@ TODO
   Libraries.System.Directory.Tree
 
   Libraries.Text.Bounded
-  Libraries.Text.Distance.Levenshtein
   Libraries.Text.Lexer
   Libraries.Text.Lexer.Core
   Libraries.Text.Lexer.Tokenizer
@@ -318,5 +314,9 @@ TODO
 Done
   Core.Name
   Core.Name.Namespace
+  Libraries.Control.ANSI                                   -- use idris2-ansi
+  Libraries.Control.ANSI.CSI                               -- use idris2-ansi
+  Libraries.Control.ANSI.SGR                               -- use idris2-ansi
   Libraries.Data.NameMap
-  Libraries.Data.IOMatrix
+  Libraries.Data.IOMatrix                                  -- use idris2-array
+  Libraries.Text.Distance.Levenshtein
