@@ -206,7 +206,6 @@ TODO
 
   Libraries.System.Directory.Tree
 
-  Libraries.Text.Bounded
   Libraries.Text.Lexer
   Libraries.Text.Lexer.Core
   Libraries.Text.Lexer.Tokenizer
@@ -314,9 +313,10 @@ TODO
 Done
   Core.Name
   Core.Name.Namespace
-  Libraries.Control.ANSI                                   -- use idris2-ansi
-  Libraries.Control.ANSI.CSI                               -- use idris2-ansi
-  Libraries.Control.ANSI.SGR                               -- use idris2-ansi
+  Libraries.Control.ANSI                                   -- use lib ansi
+  Libraries.Control.ANSI.CSI                               -- use lib ansi
+  Libraries.Control.ANSI.SGR                               -- use lib ansi
   Libraries.Data.NameMap
-  Libraries.Data.IOMatrix                                  -- use idris2-array
+  Libraries.Data.IOMatrix                                  -- use lib array
+  Libraries.Text.Bounded                                   -- use lib ilex-core
   Libraries.Text.Distance.Levenshtein
