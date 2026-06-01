@@ -1,0 +1,14 @@
+package irw-core
+brief   = "not sure yet, what this is going to be"
+version = 0.1.0
+authors = "stefan-hoeck"
+depends = base
+        , irw-libs
+
+modules =
+          IRW.Core.Name
+        , IRW.Core.Name.Namespace
+        , IRW.Core.Name.Scoped
+        , IRW.Core.FC
+
+sourcedir = "src"

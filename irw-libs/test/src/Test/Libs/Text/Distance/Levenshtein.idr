@@ -30,7 +30,7 @@ spec a b = loop (fastUnpack a) (fastUnpack b)
     loop (x :: xs) (y :: ys) =
       case x == y of
         True  => loop xs ys
-        False => 
+        False =>
           min
             (1 + loop (x :: xs) ys)
             (min (1 + loop xs (y :: ys)) (cost x y + loop xs ys))

@@ -1,4 +1,4 @@
-package irw-core
+package irw-libs
 brief   = "not sure yet, what this is going to be"
 version = 0.1.0
 authors = "stefan-hoeck"
@@ -9,15 +9,7 @@ depends = base
         , refined
 
 modules =
-          IRW.Core.Name
-        , IRW.Core.Name.Namespace
-        , IRW.Core.Name.Scoped
-        , IRW.Core.FC
-
-        , IRW.Libs.Data.List.SizeOf
-        , IRW.Libs.Data.List.Thin
-        , IRW.Libs.Data.NameMap
-        , IRW.Libs.Data.NatSet
+          IRW.Libs.Data.NatSet
         , IRW.Libs.Data.SnocList.SizeOf
         , IRW.Libs.Data.SnocList.Thin
         , IRW.Libs.Data.String.Extra
