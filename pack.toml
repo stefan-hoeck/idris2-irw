@@ -10,6 +10,11 @@ path = "irw-libs"
 ipkg = "irw-libs.ipkg"
 test = "test/test.ipkg"
 
+[custom.all.irw-tt]
+type = "local"
+path = "irw-tt"
+ipkg = "irw-tt.ipkg"
+
 #------------------------------------------------------------
 #   Custom Dependencies
 #------------------------------------------------------------

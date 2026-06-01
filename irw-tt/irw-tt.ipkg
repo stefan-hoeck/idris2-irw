@@ -1,0 +1,11 @@
+package irw-tt
+brief   = "not sure yet, what this is going to be"
+version = 0.1.0
+authors = "stefan-hoeck"
+depends = base
+        , irw-core
+
+modules =
+          IRW.Core.TT.Primitive
+
+sourcedir = "src"
