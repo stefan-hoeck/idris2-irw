@@ -68,7 +68,6 @@ TODO
   Core.InitPrimitives
   Core.LinearCheck
   Core.Metadata
-  Core.Name.CompatibleVars
   Core.Normalise
   Core.Normalise.Convert
   Core.Normalise.Eval
@@ -87,7 +86,6 @@ TODO
   Core.Transform
   Core.TT
   Core.TT.Binder
-  Core.TT.Primitive
   Core.TT.Subst
   Core.TT.Term
   Core.TT.Term.Subst
@@ -175,7 +173,6 @@ TODO
   Libraries.Data.List01
   Libraries.Data.List01.Quantifiers
   Libraries.Data.NameMap.Traversable
-  Libraries.Data.Ordering.Extra
   Libraries.Data.PosMap
   Libraries.Data.Record
   Libraries.Data.SnocList.Extra
@@ -306,9 +303,11 @@ TODO
 
 Done
   Core.Name
+  Core.Name.CompatibleVars                                 -- now part of Core.Name.Scoped
   Core.Name.Namespace
   Core.Name.Scoped
   Core.FC
+  Core.TT.Primitive
   Libraries.Control.ANSI                                   -- use lib ansi
   Libraries.Control.ANSI.CSI                               -- use lib ansi
   Libraries.Control.ANSI.SGR                               -- use lib ansi
@@ -318,5 +317,6 @@ Done
   Libraries.Data.NameMap                                   -- ditched, use SortedMap instead?
   Libraries.Data.NatSet
   Libraries.Data.IOMatrix                                  -- use lib array
+  Libraries.Data.Ordering.Extra
   Libraries.Text.Bounded                                   -- use lib ilex-core
   Libraries.Text.Distance.Levenshtein
