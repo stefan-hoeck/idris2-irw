@@ -1,3 +1,3 @@
-# The IRC Project
+# The IRW Project
 
 Please come back later...
