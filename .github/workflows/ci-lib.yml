@@ -27,7 +27,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Build libs
+        run: pack install irw-libs
+      - name: Run test libs
+        run: pack test irw-libs -n 1000
       - name: Build core
         run: pack install irw-core
-      - name: Run test core
-        run: pack test irw-core -n 1000
+      - name: Build tt
+        run: pack install irw-tt
