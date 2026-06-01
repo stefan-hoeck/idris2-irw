@@ -4,6 +4,12 @@ path = "core"
 ipkg = "irw-core.ipkg"
 test = "test/test.ipkg"
 
+[custom.all.irw-libs]
+type = "local"
+path = "libs"
+ipkg = "irw-libs.ipkg"
+test = "test/test.ipkg"
+
 #------------------------------------------------------------
 #   Custom Dependencies
 #------------------------------------------------------------

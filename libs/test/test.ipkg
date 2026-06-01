@@ -1,0 +1,9 @@
+package irw-libs-test
+version = 0.1.0
+authors = "stefan-hoeck"
+depends = irw-libs
+        , hedgehog
+
+main = Main
+executable = "irw-libs-test"
+sourcedir = "src"

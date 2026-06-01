@@ -69,7 +69,6 @@ TODO
   Core.LinearCheck
   Core.Metadata
   Core.Name.CompatibleVars
-  Core.Name.Scoped
   Core.Normalise
   Core.Normalise.Convert
   Core.Normalise.Eval
@@ -308,6 +307,7 @@ TODO
 Done
   Core.Name
   Core.Name.Namespace
+  Core.Name.Scoped
   Core.FC
   Libraries.Control.ANSI                                   -- use lib ansi
   Libraries.Control.ANSI.CSI                               -- use lib ansi
@@ -315,7 +315,7 @@ Done
   Libraries.Data.List.HasLength                            -- moved as private utility to Libraries.Data.List.SizeOf
   Libraries.Data.List.SizeOf
   Libraries.Data.List.Thin
-  Libraries.Data.NameMap
+  Libraries.Data.NameMap                                   -- ditched, use SortedMap instead?
   Libraries.Data.NatSet
   Libraries.Data.IOMatrix                                  -- use lib array
   Libraries.Text.Bounded                                   -- use lib ilex-core
