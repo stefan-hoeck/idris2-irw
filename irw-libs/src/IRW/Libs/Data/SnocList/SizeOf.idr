@@ -1,8 +1,8 @@
 module IRW.Libs.Data.SnocList.SizeOf
 
-import public Data.SnocList
-import Data.SnocList.HasLength
 import Data.Nat
+import public Data.SnocList
+import public Data.SnocList.HasLength
 
 %default total
 

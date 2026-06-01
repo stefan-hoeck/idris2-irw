@@ -1,8 +1,8 @@
 module IRW.Core.Name.Scoped
 
 import Decidable.HDecEq
-import IRW.Libs.Data.SnocList.SizeOf
 import public IRW.Core.Name
+import public IRW.Libs.Data.SnocList.SizeOf
 import public IRW.Libs.Data.SnocList.Thin
 
 %default total
