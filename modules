@@ -90,7 +90,6 @@ TODO
   Core.TT.Term
   Core.TT.Term.Subst
   Core.TT.Traversals
-  Core.TT.Var
   Core.TT.Views
   Core.TTC
   Core.Unify
@@ -163,7 +162,6 @@ TODO
 
   Libraries.Data.ANameMap
   Libraries.Data.DList
-  Libraries.Data.Erased
   Libraries.Data.Graph
   Libraries.Data.IMaybe
   Libraries.Data.IntMap
@@ -308,9 +306,11 @@ Done
   Core.Name.Scoped
   Core.FC
   Core.TT.Primitive
+  Core.TT.Var
   Libraries.Control.ANSI                                   -- use lib ansi
   Libraries.Control.ANSI.CSI                               -- use lib ansi
   Libraries.Control.ANSI.SGR                               -- use lib ansi
+  Libraries.Data.Erased                                    -- ditched, using Maybe0 and Either0 from algebra instead
   Libraries.Data.List.HasLength                            -- moved as private utility to Libraries.Data.List.SizeOf
   Libraries.Data.List.SizeOf
   Libraries.Data.List.Thin
