@@ -1,12 +1,12 @@
 [custom.all.irw-core]
 type = "local"
-path = "core"
+path = "irw-core"
 ipkg = "irw-core.ipkg"
 test = "test/test.ipkg"
 
 [custom.all.irw-libs]
 type = "local"
-path = "libs"
+path = "irw-libs"
 ipkg = "irw-libs.ipkg"
 test = "test/test.ipkg"
 
