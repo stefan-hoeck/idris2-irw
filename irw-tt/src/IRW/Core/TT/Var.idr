@@ -1,0 +1,479 @@
+module IRW.Core.TT.Var
+
+import Data.DPair
+import Data.Either0
+import Data.Fin
+import Data.So
+import Decidable.HDecEq
+import IRW.Core.Name.Scoped
+
+%default total
+
+--------------------------------------------------------------------------------
+-- IsVar Predicate
+--------------------------------------------------------------------------------
+
+||| IsVar n k ns is a proof that
+||| the name n
+||| is a position k
+||| in the snoclist ns
+public export
+data IsVar : a -> Nat -> SnocList a -> Type where
+     First : IsVar n Z (ns:<n)
+     Later : IsVar n i ns -> IsVar n (S i) (ns:<m)
+
+%name IsVar idx
+
+-- `vs` is available in the erased fragment, and the case builder
+-- pattern-matches on it. To simplify the case tree and help the
+-- coverage checker, we use an explicit dot pattern here.
+-- TODO: remove `{vs = .(_)}` once the compiler generates more optimal case trees.
+export
+0 Last : HasLength (S n) sv -> Exists (\nm => IsVar nm n sv)
+Last {sv = .(_)} (S Z) = Evidence _ First
+Last {sv = .(_)} (S (S p)) = bimap id Later (Last (S p))
+
+export
+finIdx : {idx : _} -> (0 p : IsVar x idx vars) -> Fin (length vars)
+finIdx First = FZ
+finIdx (Later l) = FS (finIdx l)
+
+||| Recover the value pointed at by an IsVar proof
+||| O(n) in the size of the index
+export
+nameAt : {vars : SnocList a} -> {idx : Nat} -> (0 p : IsVar n idx vars) -> a
+nameAt {vars = _:<n} First     = n
+nameAt               (Later p) = nameAt p
+
+||| Inversion principle for Later
+export
+dropLater : IsVar nm (S idx) (ns:<n) -> IsVar nm idx ns
+dropLater (Later p) = p
+
+export
+0 mkIsVar : HasLength m inner -> IsVar nm m ((outer :< nm) ++ inner)
+mkIsVar Z     = First
+mkIsVar (S x) = Later (mkIsVar x)
+
+||| Compute the remaining scope once the target variable has been removed
+public export
+dropIsVar :
+     (ns : SnocList a)
+  -> {idx : Nat}
+  -> (0 p : IsVar name idx ns)
+  -> SnocList a
+dropIsVar (xs:<_) First = xs
+dropIsVar (xs:<n) (Later p) = dropIsVar xs p :< n
+
+||| Throw in extra variables on the outer side of the context
+||| This is essentially the identity function
+||| This is slow so we ensure it's only used in a runtime irrelevant manner
+export
+0 embedIsVar : IsVar x idx xs -> IsVar x idx (outer ++ xs)
+embedIsVar First = First
+embedIsVar (Later p) = Later (embedIsVar p)
+
+export
+0 mkIsVarFishly : HasLength n inner -> IsVar nm n (outer:<nm<><inner)
+mkIsVarFishly hl =
+  rewrite fishAsSnocAppend (outer:<nm) inner in
+  rewrite sym $ plusZeroRightNeutral n in
+  mkIsVar (hlFish Z hl)
+
+||| Throw in extra variables on the local end of the context.
+||| This is slow so we ensure it's only used in a runtime irrelevant manner
+export
+0 weakenIsVar : (s : SizeOf ns) -> IsVar x idx xs -> IsVar x (size s + idx) (xs ++ ns)
+weakenIsVar (MkSizeOf Z Z) p =  p
+weakenIsVar (MkSizeOf (S k) (S l)) p =  Later (weakenIsVar (MkSizeOf k l) p)
+
+0 locateIsVarLT :
+     (s : SizeOf local)
+  -> So (idx < size s)
+  -> IsVar x idx (outer ++ local)
+  -> IsVar x idx local
+locateIsVarLT (MkSizeOf Z Z) so v = case v of
+  First impossible
+  Later v impossible
+locateIsVarLT (MkSizeOf (S k) (S l)) so v = case v of
+  First => First
+  Later v => Later (locateIsVarLT (MkSizeOf k l) so v)
+
+0 locateIsVarGE :
+     (s : SizeOf local)
+  -> So (idx >= size s)
+  -> IsVar x idx (outer ++ local)
+  -> IsVar x (idx `minus` size s) outer
+locateIsVarGE (MkSizeOf Z Z) so v = rewrite minusZeroRight idx in v
+locateIsVarGE (MkSizeOf (S k) (S l)) so v = case v of
+  Later v => locateIsVarGE (MkSizeOf k l) so v
+
+export
+locateIsVar :
+     {idx : Nat}
+  -> (s : SizeOf local)
+  -> (0 p : IsVar x idx (outer ++ local))
+  -> Either0 (IsVar x idx local) (IsVar x (idx `minus` size s) outer)
+locateIsVar s p = case choose (idx < size s) of
+  Left so  => Left0 (locateIsVarLT s so p)
+  Right so => Right0 (locateIsVarGE s so p)
+
+--------------------------------------------------------------------------------
+-- Variable in scope
+--------------------------------------------------------------------------------
+
+||| A variable in a scope is a name, a De Bruijn index,
+||| and a proof that the name is at that position in the scope.
+||| Everything but the De Bruijn index is erased.
+public export
+record Var {0 a : Type} (vars : SnocList a) where
+  constructor MkVar
+  {varIdx : Nat}
+  {0 varNm : a}
+  0 varPrf : IsVar varNm varIdx vars
+
+namespace Var
+
+  export
+  first : Var (ns:<n)
+  first = MkVar First
+
+  export
+  later : Var ns -> Var (ns:<n)
+  later (MkVar p) = MkVar (Later p)
+
+  export
+  isLater : Var (vs:<n) -> Maybe (Var vs)
+  isLater (MkVar First) = Nothing
+  isLater (MkVar (Later p)) = Just (MkVar p)
+
+  export
+  last : SizeOf vs -> Maybe (Var vs)
+  last (MkSizeOf Z p) = Nothing
+  last (MkSizeOf (S n) p) = Just (MkVar (snd $ Last p))
+
+  export
+  mkVar : SizeOf inner -> Var (outer :< nm ++ inner)
+  mkVar (MkSizeOf s p) = MkVar (mkIsVar p)
+
+  export
+  mkVarFishly : LSizeOf inner -> Var (outer :< nm <>< inner)
+  mkVarFishly (MkLSizeOf _ p) = MkVar (mkIsVarFishly p)
+
+  ||| Generate all variables
+  export
+  allVars : (vars : Scope) -> SnocList (Var vars)
+  allVars = go zero
+    where
+      go : LSizeOf local -> (vs : Scope) -> SnocList (Var (vs <>< local))
+      go s [<]     = [<]
+      go s (vs:<v) = go (suc s) vs :< mkVarFishly s
+
+export
+Eq (Var xs) where
+  v == w = varIdx v == varIdx w
+
+export
+Show (Var ns) where
+  show v = show (varIdx v)
+
+
+--------------------------------------------------------------------------------
+-- Named variable in scope
+--------------------------------------------------------------------------------
+
+public export
+record NVar {0 a : Type} (nm : a) (vars : SnocList a) where
+  constructor MkNVar
+  {nvarIdx : Nat}
+  0 nvarPrf : IsVar nm nvarIdx vars
+
+namespace NVar
+
+  export
+  first : NVar n (ns:<n)
+  first = MkNVar First
+
+  export
+  later : NVar nm ns -> NVar nm (ns:<n)
+  later (MkNVar p) = MkNVar (Later p)
+
+  export
+  isLater : NVar nm (ns:<n) -> Maybe (NVar nm ns)
+  isLater (MkNVar First) = Nothing
+  isLater (MkNVar (Later p)) = Just (MkNVar p)
+
+export
+forgetName : NVar nm vars -> Var vars
+forgetName (MkNVar p) = MkVar p
+
+export
+recoverName : (v : Var vars) -> NVar (varNm v) vars
+recoverName (MkVar p) = MkNVar p
+
+export
+mkNVar : SizeOf inner -> NVar nm (outer:<nm ++ inner)
+mkNVar (MkSizeOf s p) = MkNVar (mkIsVar p)
+
+export
+mkNVarFishly : LSizeOf inner -> NVar nm (outer:<nm<><inner)
+mkNVarFishly (MkLSizeOf _ p) = MkNVar (mkIsVarFishly p)
+
+export
+locateNVar :
+     SizeOf local
+  -> NVar nm (outer ++ local)
+  -> Either (NVar nm local) (NVar nm outer)
+locateNVar s (MkNVar p) = case locateIsVar s p of
+  Left0 p  => Left (MkNVar p)
+  Right0 p => Right (MkNVar p)
+
+public export
+dropNVar : {ns : SnocList a} -> NVar nm ns -> SnocList a
+dropNVar (MkNVar p) = dropIsVar ns p
+
+--------------------------------------------------------------------------------
+-- Scope checking
+--------------------------------------------------------------------------------
+
+export
+isDeBruijn : Nat -> (vars : SnocList Name) -> Maybe (Var vars)
+isDeBruijn Z     (_ :<_) = pure first
+isDeBruijn (S k) (vs:<_) = later <$> isDeBruijn k vs
+isDeBruijn _     _       = Nothing
+
+export
+isNVar : (n : Name) -> (ns : SnocList Name) -> Maybe (NVar n ns)
+isNVar n [<]     = Nothing
+isNVar n (ms:<m) =
+  case hdecEq n m of
+    Nothing0 => map later (isNVar n ms)
+    Just0 p  => Just $ rewrite p in MkNVar First
+
+export
+isVar : (n : Name) -> (ns : SnocList Name) -> Maybe (Var ns)
+isVar n ns = forgetName <$> isNVar n ns
+
+export
+locateVar :
+     SizeOf local
+  -> Var (outer ++ local)
+  -> Either (Var local) (Var outer)
+locateVar s v  = bimap forgetName forgetName $ locateNVar s (recoverName v)
+
+--------------------------------------------------------------------------------
+-- Weakening
+--------------------------------------------------------------------------------
+
+export
+weakenNVar : SizeOf ns -> NVar name outer -> NVar name (outer ++ ns)
+weakenNVar s (MkNVar {nvarIdx} p) =
+  MkNVar {nvarIdx = plus (size s) nvarIdx} (weakenIsVar s p)
+
+export
+embedNVar : NVar name ns -> NVar name (outer ++ ns)
+embedNVar (MkNVar p) = MkNVar (embedIsVar p)
+
+export
+insertNVar :
+     SizeOf local
+  -> NVar nm (outer ++ local)
+  -> NVar nm (outer :<n ++ local)
+insertNVar p v = case locateNVar p v of
+  Left v => embedNVar v
+  Right v => weakenNVar p (later v)
+
+export
+insertNVarFishly :
+     LSizeOf local
+  -> NVar nm (outer <>< local)
+  -> NVar nm (outer:<n<><local)
+insertNVarFishly p v =
+  rewrite fishAsSnocAppend (outer:<n) local in
+  insertNVar (zero <>< p) $ replace {p = NVar nm} (fishAsSnocAppend outer local) v
+
+export
+insertNVarNames : GenWeakenable (NVar name)
+insertNVarNames p q v =
+  case locateNVar p v of
+    Left v => embedNVar v
+    Right v =>
+      rewrite sym (appendAssociative outer ns local)
+      in weakenNVar (q + p) v
+
+||| The (partial) inverse to insertNVar
+export
+removeNVar :
+     SizeOf local
+  -> NVar nm (outer:<n ++ local)
+  -> Maybe (NVar nm (outer++local))
+removeNVar s var =
+  case locateNVar s var of
+    Left v => pure (embedNVar v)
+    Right v => weakenNVar s <$> isLater v
+
+export
+insertVar :
+     SizeOf local
+  -> Var (outer++local)
+  -> Var (outer:<n++local)
+insertVar p v = forgetName $ insertNVar p (recoverName v)
+
+weakenVar : SizeOf ns -> Var outer -> Var (outer++ns)
+weakenVar p v = forgetName $ weakenNVar p (recoverName v)
+
+insertVarNames : GenWeakenable Var
+insertVarNames p q v = forgetName $ insertNVarNames p q (recoverName v)
+
+||| The (partial) inverse to insertVar
+export
+removeVar :
+     SizeOf local
+  -> Var (outer:<n++local)
+  -> Maybe (Var (outer++local))
+removeVar s var = forgetName <$> removeNVar s (recoverName var)
+
+--------------------------------------------------------------------------------
+-- Strengthening
+--------------------------------------------------------------------------------
+
+export
+strengthenIsVar :
+     {n : Nat}
+  -> (s : SizeOf inner)
+  -> (0 p : IsVar x n (vars++inner))
+  -> Maybe0 (IsVar x (n `minus` size s) vars)
+strengthenIsVar s p =
+  case locateIsVar s p of
+    Left0 _  => Nothing0
+    Right0 p => Just0 p
+
+strengthenVar :
+     SizeOf inner
+  -> Var (vars++inner)
+  -> Maybe (Var vars)
+strengthenVar s (MkVar p) =
+  case strengthenIsVar s p of
+    Nothing0 => Nothing
+    Just0 p  => Just (MkVar p)
+
+strengthenNVar :
+     SizeOf inner
+  -> NVar x (vars++inner)
+  -> Maybe (NVar x vars)
+strengthenNVar s (MkNVar p) =
+  case strengthenIsVar s p of
+    Nothing0 => Nothing
+    Just0 p  => Just (MkNVar p)
+
+--------------------------------------------------------------------------------
+-- Reindexing
+--------------------------------------------------------------------------------
+
+0 lookup :
+     CompatibleVars xs ys
+  -> {idx : Nat}
+  -> (0 p : IsVar {a} name idx xs)
+  -> a
+lookup Pre p = name
+lookup (Ext {n} x) First = n
+lookup (Ext x) (Later p) = lookup x p
+
+0 compatIsVar :
+     (ns : CompatibleVars xs ys)
+  -> {idx : Nat}
+  -> (0 p : IsVar name idx xs)
+  -> IsVar (lookup ns p) idx ys
+compatIsVar Pre p = p
+compatIsVar (Ext {n} x) First = First
+compatIsVar (Ext {n} x) (Later p) = Later (compatIsVar x p)
+
+compatVar : CompatibleVars xs ys -> Var xs -> Var ys
+compatVar prf (MkVar p) = MkVar (compatIsVar prf p)
+
+--------------------------------------------------------------------------------
+-- Thinning
+--------------------------------------------------------------------------------
+
+export
+thinIsVar :
+     {idx : Nat}
+  -> (0 p : IsVar name idx xs)
+  -> Thin xs ys
+  -> Var ys
+thinIsVar p Refl = MkVar p
+thinIsVar p (Drop th) = later (thinIsVar p th)
+thinIsVar First (Keep th) = first
+thinIsVar (Later p) (Keep th) = later (thinIsVar p th)
+
+export
+shrinkIsVar :
+     {idx : Nat}
+  -> (0 p : IsVar name idx xs)
+  -> Thin ys xs
+  -> Maybe (Var ys)
+shrinkIsVar prf Refl = Just (MkVar prf)
+shrinkIsVar First (Drop p) = Nothing
+shrinkIsVar (Later x) (Drop p) = shrinkIsVar x p
+shrinkIsVar First (Keep p) = Just first
+shrinkIsVar (Later x) (Keep p) = later <$> shrinkIsVar x p
+
+--------------------------------------------------------------------------------
+-- Putting it all together
+--------------------------------------------------------------------------------
+
+export %hint
+0 FreelyEmbeddableIsVar : FreelyEmbeddable (IsVar x k)
+FreelyEmbeddableIsVar = MkFreelyEmbeddable embedIsVar
+
+export %inline
+GenWeaken (Var {a = Name}) where
+  genWeakenNs = insertVarNames
+
+export %hint
+WeakenVar : Weaken (Var {a = Name})
+WeakenVar = GenWeakenWeakens
+
+export %inline
+Strengthen (Var {a = Name}) where
+  strengthenNs = strengthenVar
+
+export
+FreelyEmbeddable (Var {a = Name}) where
+  embed (MkVar p) = MkVar (embedIsVar p)
+
+export
+IsScoped (Var {a = Name}) where
+  compatNs = compatVar
+
+  thin (MkVar p) = thinIsVar p
+  shrink (MkVar p) = shrinkIsVar p
+
+export
+GenWeaken (NVar {a = Name} nm) where
+  genWeakenNs = insertNVarNames
+
+export %hint
+WeakenNVar : Weaken (NVar {a = Name} nm)
+WeakenNVar = GenWeakenWeakens
+
+export %inline
+Strengthen (NVar {a = Name} nm) where
+  strengthenNs = strengthenNVar
+
+export %inline
+FreelyEmbeddable (NVar {a = Name} nm) where
+  embed (MkNVar p) = MkNVar (embedIsVar p)
+
+------------------------------------------------------------------------
+-- Corollaries
+
+||| Moving the zeroth variable under a set number of variables
+export
+shiftUnderNs :
+     SizeOf {a = Name} inner
+  -> {idx : _}
+  -> (0 p : IsVar n idx (outer ++ inner :< x))
+  -> NVar n (outer :< x ++ inner)
+shiftUnderNs s First = weakenNs s (MkNVar First)
+shiftUnderNs s (Later p) = insertNVar s (MkNVar p)

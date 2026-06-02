@@ -7,5 +7,6 @@ depends = base
 
 modules =
           IRW.Core.TT.Primitive
+        , IRW.Core.TT.Var
 
 sourcedir = "src"
