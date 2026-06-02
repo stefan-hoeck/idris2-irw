@@ -1,10 +1,4 @@
 TODO
-  Algebra
-  Algebra.Preorder
-  Algebra.Semiring
-  Algebra.SizeChange
-  Algebra.ZeroOneOmega
-
   Compiler.ANF
   Compiler.CaseOpts
   Compiler.Common
@@ -300,6 +294,11 @@ TODO
   Yaffle.REPL
 
 Done
+  Algebra
+  Algebra.Preorder
+  Algebra.Semiring
+  Algebra.SizeChange
+  Algebra.ZeroOneOmega
   Core.Name
   Core.Name.CompatibleVars                                 -- now part of Core.Name.Scoped
   Core.Name.Namespace

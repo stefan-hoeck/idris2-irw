@@ -5,8 +5,12 @@ authors = "stefan-hoeck"
 depends = base
         , irw-core
 
-modules =
-          IRW.Core.TT.Primitive
+modules = IRW.Algebra
+        , IRW.Algebra.Preorder
+        , IRW.Algebra.Semiring
+        , IRW.Algebra.SizeChange
+        , IRW.Algebra.ZeroOneOmega
+        , IRW.Core.TT.Primitive
         , IRW.Core.TT.Var
 
 sourcedir = "src"
