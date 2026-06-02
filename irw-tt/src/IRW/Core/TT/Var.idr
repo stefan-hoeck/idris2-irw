@@ -9,10 +9,6 @@ import IRW.Core.Name.Scoped
 
 %default total
 
-data LSizeOf : Nat -> List a -> Type where
-  Nil  : LSizeOf Z []
-  (::) : (0 x: a) -> LSizeOf n xs -> LSizeOf (S n) (x::xs)
-
 --------------------------------------------------------------------------------
 -- IsVar Predicate
 --------------------------------------------------------------------------------
@@ -77,9 +73,12 @@ export
 embedIsVar First = First
 embedIsVar (Later p) = Later (embedIsVar p)
 
--- TODO
 export
-0 mkIsVarFishly : LSizeOf n inner -> IsVar nm n (outer:<nm<><inner)
+0 mkIsVarFishly : HasLength n inner -> IsVar nm n (outer:<nm<><inner)
+mkIsVarFishly hl =
+  rewrite fishAsSnocAppend (outer:<nm) inner in
+  rewrite sym $ plusZeroRightNeutral n in
+  mkIsVar (hlFish Z hl)
 
 ||| Throw in extra variables on the local end of the context.
 ||| This is slow so we ensure it's only used in a runtime irrelevant manner
@@ -158,17 +157,17 @@ namespace Var
   mkVar (MkSizeOf s p) = MkVar (mkIsVar p)
 
   export
-  mkVarFishly : {n : _} -> LSizeOf n inner -> Var (outer :< nm <>< inner)
-  mkVarFishly p = MkVar (mkIsVarFishly p)
+  mkVarFishly : LSizeOf inner -> Var (outer :< nm <>< inner)
+  mkVarFishly (MkLSizeOf _ p) = MkVar (mkIsVarFishly p)
 
   ||| Generate all variables
   export
   allVars : (vars : Scope) -> SnocList (Var vars)
-  allVars = go [] where
-
-    go : {n : _} -> LSizeOf n local -> (vs : Scope) -> SnocList (Var (vs <>< local))
-    go s [<]     = [<]
-    go s (vs:<v) = go (v::s) vs :< mkVarFishly s
+  allVars = go zero
+    where
+      go : LSizeOf local -> (vs : Scope) -> SnocList (Var (vs <>< local))
+      go s [<]     = [<]
+      go s (vs:<v) = go (suc s) vs :< mkVarFishly s
 
 export
 Eq (Var xs) where
@@ -217,8 +216,8 @@ mkNVar : SizeOf inner -> NVar nm (outer:<nm ++ inner)
 mkNVar (MkSizeOf s p) = MkNVar (mkIsVar p)
 
 export
-mkNVarFishly : {m : _} -> LSizeOf m inner -> NVar nm (outer:<nm<><inner)
-mkNVarFishly p = MkNVar (mkIsVarFishly p)
+mkNVarFishly : LSizeOf inner -> NVar nm (outer:<nm<><inner)
+mkNVarFishly (MkLSizeOf _ p) = MkNVar (mkIsVarFishly p)
 
 export
 locateNVar :
@@ -286,22 +285,21 @@ insertNVar p v = case locateNVar p v of
 
 export
 insertNVarFishly :
-     LSizeOf m local
+     LSizeOf local
   -> NVar nm (outer <>< local)
   -> NVar nm (outer:<n<><local)
--- insertNVarFishly p v
---   = rewrite chipsAsListAppend local (n :: outer) in
---     insertNVar (p <>> zero)
---   $ replace {p = NVar nm} (chipsAsListAppend local outer) v
+insertNVarFishly p v =
+  rewrite fishAsSnocAppend (outer:<n) local in
+  insertNVar (zero <>< p) $ replace {p = NVar nm} (fishAsSnocAppend outer local) v
 
 export
 insertNVarNames : GenWeakenable (NVar name)
--- insertNVarNames p q v =
---   case locateNVar p v of
---     Left v => embedNVar v
---     Right v =>
---       rewrite appendAssociative local ns outer in
---       weakenNVar (p + q) v
+insertNVarNames p q v =
+  case locateNVar p v of
+    Left v => embedNVar v
+    Right v =>
+      rewrite sym (appendAssociative outer ns local)
+      in weakenNVar (q + p) v
 
 ||| The (partial) inverse to insertNVar
 export
