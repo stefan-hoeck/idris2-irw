@@ -1,4 +1,4 @@
-module IRW.Libs.Data.SnocList.SizeOf
+module IRW.Libs.Data.SizeOf
 
 import Data.Nat
 import Data.List

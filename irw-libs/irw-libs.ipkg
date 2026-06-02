@@ -11,7 +11,7 @@ depends = base
 modules =
           IRW.Libs.Data.NatSet
         , IRW.Libs.Data.Ordering.Extra
-        , IRW.Libs.Data.SnocList.SizeOf
+        , IRW.Libs.Data.SizeOf
         , IRW.Libs.Data.SnocList.Thin
         , IRW.Libs.Data.String.Extra
         , IRW.Libs.Text.Distance.Levenshtein
