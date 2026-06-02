@@ -10,6 +10,8 @@ modules = IRW.Algebra
         , IRW.Algebra.Semiring
         , IRW.Algebra.SizeChange
         , IRW.Algebra.ZeroOneOmega
+
+        , IRW.Core.TT.Binder
         , IRW.Core.TT.Primitive
         , IRW.Core.TT.Var
 
