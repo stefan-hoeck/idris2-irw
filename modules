@@ -182,7 +182,6 @@ TODO
   Libraries.Data.WithDefault
   Libraries.Data.WithData
 
-  Libraries.Decidable.Equality
 
   Libraries.System.Directory.Tree
 
@@ -318,5 +317,7 @@ Done
   Libraries.Data.NatSet
   Libraries.Data.IOMatrix                                  -- use lib array
   Libraries.Data.Ordering.Extra
+  Libraries.Data.String                                    -- ditched, now in base
+  Libraries.Decidable.Equality                             -- ditched, we use Maybe0 from algebra
   Libraries.Text.Bounded                                   -- use lib ilex-core
   Libraries.Text.Distance.Levenshtein
