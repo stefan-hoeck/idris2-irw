@@ -305,6 +305,7 @@ Done
   Core.TT.Primitive
   Core.TT.Subst
   Core.TT.Term
+  Core.TT.Term.Subst
   Core.TT.Var
   Libraries.Control.ANSI                                   -- use lib ansi
   Libraries.Control.ANSI.CSI                               -- use lib ansi
