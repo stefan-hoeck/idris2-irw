@@ -79,7 +79,6 @@ TODO
   Core.Termination
   Core.Transform
   Core.TT
-  Core.TT.Subst
   Core.TT.Term
   Core.TT.Term.Subst
   Core.TT.Traversals
@@ -305,6 +304,7 @@ Done
   Core.FC
   Core.TT.Binder
   Core.TT.Primitive
+  Core.TT.Subst
   Core.TT.Var
   Libraries.Control.ANSI                                   -- use lib ansi
   Libraries.Control.ANSI.CSI                               -- use lib ansi
