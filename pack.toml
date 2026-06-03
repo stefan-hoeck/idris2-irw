@@ -22,4 +22,5 @@ ipkg = "irw-tt.ipkg"
 [custom.all]
 algebra.commit         = "latest:main"
 array.commit           = "latest:main"
+hedgehog.commit        = "latest:main"
 refined.commit         = "latest:main"

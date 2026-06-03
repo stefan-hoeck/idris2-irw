@@ -1,5 +1,6 @@
 module Main
 
+import Test.Namespace
 import Hedgehog
 
 %default total
@@ -7,5 +8,5 @@ import Hedgehog
 main : IO ()
 main =
   test
-    [
+    [ Namespace.props
     ]
