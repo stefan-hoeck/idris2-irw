@@ -1,0 +1,9 @@
+package irw-tt-test-app
+version = 0.1.0
+authors = "stefan-hoeck"
+depends = irw-tt
+        , irw-core-test
+
+main = Main
+executable = "irw-tt-test"
+sourcedir = "src"

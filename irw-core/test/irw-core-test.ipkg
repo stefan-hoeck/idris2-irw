@@ -1,9 +1,9 @@
-package irw-core-test-app
+package irw-core-test
 version = 0.1.0
 authors = "stefan-hoeck"
 depends = irw-core
         , hedgehog
 
-main = Main
-executable = "irw-core-test"
 sourcedir = "src"
+
+modules = Gen.Name

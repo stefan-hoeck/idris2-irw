@@ -1,0 +1,9 @@
+package irw-tt-test
+version = 0.1.0
+authors = "stefan-hoeck"
+depends = irw-tt
+        , irw-core-test
+
+sourcedir = "src"
+
+modules = Gen.TT
