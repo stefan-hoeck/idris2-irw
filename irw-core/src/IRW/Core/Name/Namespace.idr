@@ -85,16 +85,15 @@ replace (MkMI old) (MkNS new) (MkNS ns) = MkNS (go ns)
     go [<]       = [<]
     go x@(ms:<m) = if old == x then new else go ms :< m
 
-namespace ModuleIdent
-  ||| A.B.C -> "A/B/C"
-  export %inline
-  toPath : ModuleIdent -> String
-  toPath = snocSep "/" . modules
+||| A.B.C -> "A/B/C"
+export %inline
+toPath : ModuleIdent -> String
+toPath = snocSep "/" . modules
 
-  export %inline
-  parent : ModuleIdent -> Maybe ModuleIdent
-  parent (MkMI $ r :< _) = Just $ MkMI r
-  parent _               = Nothing
+export %inline
+parent : ModuleIdent -> Maybe ModuleIdent
+parent (MkMI $ r :< _) = Just $ MkMI r
+parent _               = Nothing
 
 -------------------------------------------------------------------------------------
 -- HIERARCHICAL STRUCTURE
@@ -127,7 +126,7 @@ isParentOf (MkNS ms) (MkNS ns) = isPrefixOf (ms<>>[]) (ns<>>[])
 ||| while `isApproximationOf Data.List Data.List.Properties` should not.
 export
 isApproximationOf : (given, candidate : Namespace) -> Bool
-isApproximationOf (MkNS ms) (MkNS ns) = isPrefixOf (ms <>> []) (ns <>> [])
+isApproximationOf (MkNS ms) (MkNS ns) = isSuffixOf (ms <>> []) (ns <>> [])
 
 ||| We can check whether a given string (assumed to be a valid Namespace ident)
 ||| is in the path of a given namespace.

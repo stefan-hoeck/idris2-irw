@@ -33,5 +33,7 @@ jobs:
         run: pack test irw-libs -n 1000
       - name: Build core
         run: pack install irw-core
+      - name: Run test core
+        run: pack test irw-core -n 1000
       - name: Build tt
         run: pack install irw-tt
