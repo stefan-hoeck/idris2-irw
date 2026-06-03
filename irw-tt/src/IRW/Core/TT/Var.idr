@@ -430,10 +430,6 @@ export %inline
 GenWeaken (Var {a = Name}) where
   genWeakenNs = insertVarNames
 
-export %hint
-WeakenVar : Weaken (Var {a = Name})
-WeakenVar = GenWeakenWeakens
-
 export %inline
 Strengthen (Var {a = Name}) where
   strengthenNs = strengthenVar
@@ -452,10 +448,6 @@ IsScoped (Var {a = Name}) where
 export
 GenWeaken (NVar {a = Name} nm) where
   genWeakenNs = insertNVarNames
-
-export %hint
-WeakenNVar : Weaken (NVar {a = Name} nm)
-WeakenNVar = GenWeakenWeakens
 
 export %inline
 Strengthen (NVar {a = Name} nm) where

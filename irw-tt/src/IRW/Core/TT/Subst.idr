@@ -38,7 +38,7 @@ findDrop k s var sub =
 
 export
 find :
-     {auto wk : Weaken tm}
+     {auto wk : GenWeaken tm}
   -> (forall vars. Var vars -> tm vars)
   -> SizeOf outer
   -> SizeOf dropped

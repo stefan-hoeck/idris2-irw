@@ -19,8 +19,8 @@ substTerm : Substitutable Term Term
 substTerms : Substitutable Term (List . Term)
 substBinder : Substitutable Term (Binder . Term)
 
-substTerm outer dropped env (Local fc r _ prf)
-    = find (\ (MkVar p) => Local fc r _ p) outer dropped (MkVar prf) env
+substTerm outer dropped env (Local fc r v)
+    = find (Local fc r) outer dropped v env
 substTerm outer dropped env (Ref fc x name) = Ref fc x name
 substTerm outer dropped env (Meta fc n i xs)
     = Meta fc n i (substTerms outer dropped env xs)

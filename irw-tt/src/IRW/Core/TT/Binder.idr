@@ -1,9 +1,13 @@
 module IRW.Core.TT.Binder
 
+import Derive.Prelude
 import IRW.Algebra
 import IRW.Core.FC
 
 %default total
+%language ElabReflection
+%hide Language.Reflection.TT.FC
+%hide Language.Reflection.TT.PiInfo
 
 --------------------------------------------------------------------------------
 -- Pi information classifies the kind of pi type this is
@@ -25,6 +29,7 @@ data PiInfo t =
   ||| passed explicitly
   DefImplicit t
 
+%runElab derive "PiInfo" [Show]
 %name PiInfo pinfo
 
 namespace PiInfo
@@ -58,11 +63,11 @@ forgetDef AutoImplicit = AutoImplicit
 forgetDef (DefImplicit t) = Implicit
 
 export
-Show t => Show (PiInfo t) where
-  show Implicit = "Implicit"
-  show Explicit = "Explicit"
-  show AutoImplicit = "AutoImplicit"
-  show (DefImplicit t) = "DefImplicit " ++ show t
+Interpolation t => Interpolation (PiInfo t) where
+  interpolate Implicit = "Implicit"
+  interpolate Explicit = "Explicit"
+  interpolate AutoImplicit = "AutoImplicit"
+  interpolate (DefImplicit t) = "DefImplicit \{t}"
 
 export
 Eq t => Eq (PiInfo t) where
@@ -81,13 +86,15 @@ record PiBindData (t : Type) where
   info : PiInfo t
   boundType : t
 
+%runElab derive "PiBindData" [Show]
+
 public export
 mapType : (t -> t) -> PiBindData t -> PiBindData t
 mapType f = {boundType $= f}
 
 export
-Show t => Show (PiBindData t) where
-  show bind = show bind.info ++ ", " ++ show bind.boundType
+Interpolation t => Interpolation (PiBindData t) where
+  interpolate (MkPiBindData i t) = "\{i}, \{t}"
 
 --------------------------------------------------------------------------------
 -- Different types of binders we may encounter
@@ -95,22 +102,30 @@ Show t => Show (PiBindData t) where
 
 public export
 data Binder : Type -> Type where
-     -- Lambda bound variables with their implicitness
+
+     ||| Lambda bound variables with their implicitness
      Lam : FC -> RigCount -> PiInfo type -> (ty : type) -> Binder type
-     -- Let bound variables with their value
+
+     ||| Let bound variables with their value
      Let : FC -> RigCount -> (val : type) -> (ty : type) -> Binder type
-     -- Forall/pi bound variables with their implicitness
+
+     |||Forall/pi bound variables with their implicitness
      Pi : FC -> RigCount -> PiInfo type -> (ty : type) -> Binder type
-     -- pattern bound variables. The PiInfo gives the implicitness at the
-     -- point it was bound (Explicit if it was explicitly named in the
-     -- program)
+
+     ||| Pattern bound variables. The PiInfo gives the implicitness at the
+     ||| point it was bound (Explicit if it was explicitly named in the
+     ||| program)
      PVar : FC -> RigCount -> PiInfo type -> (ty : type) -> Binder type
-     -- variable bound for an as pattern (Like a let, but no computational
-     -- force, and only used on the lhs. Converted to a let on the rhs because
-     -- we want the computational behaviour.)
+
+     ||| Variable bound for an as pattern (Like a let, but no computational
+     ||| force, and only used on the lhs. Converted to a let on the rhs because
+     ||| we want the computational behaviour.)
      PLet : FC -> RigCount -> (val : type) -> (ty : type) -> Binder type
-     -- the type of pattern bound variables
+
+     ||| The type of pattern bound variables
      PVTy : FC -> RigCount -> (ty : type) -> Binder type
+
+%runElab derive "Binder" [Show]
 
 %name Binder bd
 
@@ -168,13 +183,14 @@ setMultiplicity (PVar fc _ p ty) c = PVar fc c p ty
 setMultiplicity (PLet fc _ val ty) c = PLet fc c val ty
 setMultiplicity (PVTy fc _ ty) c = PVTy fc c ty
 
-Show ty => Show (Binder ty) where
-  show (Lam _ c _ t) = "\\" ++ showCount c ++ show t
-  show (Pi _ c _ t) = "Pi " ++ showCount c ++ show t
-  show (Let _ c v t) = "let " ++ showCount c ++ show v ++ " : " ++ show t
-  show (PVar _ c _ t) = "pat " ++ showCount c ++ show t
-  show (PLet _ c v t) = "plet " ++ showCount c ++ show v ++ " : " ++ show t
-  show (PVTy _ c t) = "pty " ++ showCount c ++ show t
+export
+Interpolation ty => Interpolation (Binder ty) where
+  interpolate (Lam _ c _ t) = "\\\{c} \{t}"
+  interpolate (Pi _ c _ t) = "Pi\{c} \{t}"
+  interpolate (Let _ c v t) = "let\{c} \{v}:\{t}"
+  interpolate (PVar _ c _ t) = "pat\{c} \{t}"
+  interpolate (PLet _ c v t) = "plet\{c} \{v}:\{t}"
+  interpolate (PVTy _ c t) = "pty\{c} \{t}"
 
 export
 setType : Binder tm -> tm -> Binder tm

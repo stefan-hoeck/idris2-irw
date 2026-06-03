@@ -13,6 +13,12 @@ data ZeroOneOmega = Rig0 | Rig1 | RigW
 
 %runElab derive "ZeroOneOmega" [Show,Eq]
 
+export
+Interpolation ZeroOneOmega where
+  interpolate Rig0 = " 0"
+  interpolate Rig1 = " 1"
+  interpolate RigW = ""
+
 %name ZeroOneOmega rig
 
 export
