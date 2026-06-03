@@ -1,8 +1,6 @@
 module Test.Name
 
-import Decidable.HDecEq
-import Data.Maybe0
-import Data.List.Quantifiers
+import Property.HDecEq
 import Gen.Name
 
 %default total
@@ -20,12 +18,7 @@ prop_hdecEq_self =
       Nothing0 => failWith Nothing "\{n} not equal to itself"
 
 prop_hdecEq_eq : Property
-prop_hdecEq_eq =
-  property $ do
-    [x,y] <- forAll $ hlist [names,names]
-    case hdecEq x y of
-      Just0 _  => x === y
-      Nothing0 => x /== y
+prop_hdecEq_eq = hdecEqLaw names
 
 export
 props : Group
