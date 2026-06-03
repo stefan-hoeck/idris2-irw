@@ -138,27 +138,27 @@ Embeddable tm = {0 outer, vars : Scope} -> tm vars -> tm (outer++vars)
 -- Interfaces
 --------------------------------------------------------------------------------
 
-public export
-interface Weaken (0 tm : Scoped) where
-  constructor MkWeaken
-  weaken : tm vars -> tm (vars:<nm)
-  weakenNs : Weakenable tm
-  -- default implementations
-  weaken = weakenNs (suc zero)
-
 -- This cannot be merged with Weaken because of WkCExp
 public export
 interface GenWeaken (0 tm : Scoped) where
   constructor MkGenWeaken
   genWeakenNs : GenWeakenable tm
 
-export
+export %inline
 genWeaken :
      {auto gw : GenWeaken tm}
   -> SizeOf local
   -> tm (outer++local)
   -> tm ((outer:<n)++local)
 genWeaken l = genWeakenNs l (suc zero)
+
+export %inline
+weakenNs : GenWeaken tm => Weakenable tm
+weakenNs = genWeakenNs zero
+
+export %inline
+weaken : GenWeaken tm => tm vars -> tm (vars:<nm)
+weaken = genWeaken zero
 
 public export
 interface Strengthen (0 tm : Scoped) where
@@ -176,43 +176,8 @@ interface FreelyEmbeddable (0 tm : Scoped) where
   embed : Embeddable tm
   embed = believe_me
 
-export
-FunctorFreelyEmbeddable : Functor f => FreelyEmbeddable tm => FreelyEmbeddable (f . tm)
-FunctorFreelyEmbeddable = MkFreelyEmbeddable believe_me
-
-export
-ListFreelyEmbeddable : FreelyEmbeddable tm => FreelyEmbeddable (List . tm)
-ListFreelyEmbeddable = FunctorFreelyEmbeddable
-
-export
-MaybeFreelyEmbeddable : FreelyEmbeddable tm => FreelyEmbeddable (Maybe . tm)
-MaybeFreelyEmbeddable = FunctorFreelyEmbeddable
-
-export
-GenWeakenWeakens : GenWeaken tm => Weaken tm
-GenWeakenWeakens = MkWeaken (genWeaken zero) (genWeakenNs zero)
-
-export
-FunctorGenWeaken : Functor f => GenWeaken tm => GenWeaken (f . tm)
-FunctorGenWeaken = MkGenWeaken (\ l, s => map (genWeakenNs l s))
-
-export
-FunctorWeaken : Functor f => Weaken tm => Weaken (f . tm)
-FunctorWeaken = MkWeaken (go (suc zero)) go where
-
-  go : Weakenable (f . tm)
-  go s = map (weakenNs s)
-
-export
-ListWeaken : Weaken tm => Weaken (List . tm)
-ListWeaken = FunctorWeaken
-
-export
-MaybeWeaken : Weaken tm => Weaken (Maybe . tm)
-MaybeWeaken = FunctorWeaken
-
 public export
-interface Weaken tm => IsScoped (0 tm : Scoped) where
+interface GenWeaken tm => IsScoped (0 tm : Scoped) where
   compatNs : CompatibleVars sx sy -> tm sx -> tm sy
 
   thin : Thinnable tm

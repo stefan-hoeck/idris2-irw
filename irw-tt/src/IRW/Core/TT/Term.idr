@@ -1,5 +1,6 @@
 module IRW.Core.TT.Term
 
+import Derive.Prelude
 import IRW.Algebra
 
 import IRW.Core.FC
@@ -15,28 +16,31 @@ import Data.String
 import IRW.Libs.Data.SizeOf
 
 %default total
+%language ElabReflection
+%hide Language.Reflection.TT.Constant
+%hide Language.Reflection.TT.FC
+%hide Language.Reflection.TT.IsVar
+%hide Language.Reflection.TT.LazyReason
+%hide Language.Reflection.TT.Name
+%hide Language.Reflection.TT.Namespace
+%hide Language.Reflection.TT.NameType
+%hide Language.Reflection.TT.PiInfo
+%hide Language.Reflection.TTImp.UseSide
 
-------------------------------------------------------------------------
--- Name types
--- This information is cached in Refs (global variables) so as to avoid
--- too many lookups
+--------------------------------------------------------------------------------
+-- Name Types
+--------------------------------------------------------------------------------
 
 public export
 data NameType : Type where
      Bound   : NameType
      Func    : NameType
-     DataCon : (tag : Int) -> (arity : Nat) -> NameType
+     DataCon : (tag : Bits32) -> (arity : Nat) -> NameType
      TyCon   : (arity : Nat) -> NameType
 
-%name NameType nt
+%runElab derive "NameType" [Show,Eq]
 
-export
-covering
-Show NameType where
-  showPrec d Bound = "Bound"
-  showPrec d Func = "Func"
-  showPrec d (DataCon tag ar) = showCon d "DataCon" $ showArg tag ++ showArg ar
-  showPrec d (TyCon ar) = showCon d "TyCon" $ showArg ar
+%name NameType nt
 
 export
 isCon : NameType -> Maybe Nat
@@ -44,40 +48,47 @@ isCon (DataCon t a) = Just a
 isCon (TyCon a) = Just a
 isCon _ = Nothing
 
--- Typechecked terms
--- These are guaranteed to be well-scoped wrt local variables, because they are
--- indexed by the names of local variables in scope
+--------------------------------------------------------------------------------
+-- Type-checked Terms
+--------------------------------------------------------------------------------
+
 public export
 data LazyReason = LInf | LLazy | LUnknown
 
+%runElab derive "LazyReason" [Show,Eq,Ord]
+
 %name LazyReason lz
 
--- For as patterns matching linear arguments, select which side is
--- consumed
+||| For as patterns matching linear arguments, select which side is
+||| consumed
 public export
 data UseSide = UseLeft | UseRight
+
+%runElab derive "UseSide" [Show,Eq,Ord]
 
 %name UseSide side
 
 public export
-data WhyErased a
-  = Placeholder
-  | Impossible
-  | Dotted a
+data WhyErased a = Placeholder | Impossible | Dotted a
+
+%runElab derive "WhyErased" [Show,Eq,Ord]
 
 export
-Show a => Show (WhyErased a) where
-  show Placeholder = "placeholder"
-  show Impossible = "impossible"
-  show (Dotted x) = "dotted \{show x}"
+Interpolation a => Interpolation (WhyErased a) where
+  interpolate Placeholder = "placeholder"
+  interpolate Impossible = "impossible"
+  interpolate (Dotted x) = "dotted \{x}"
 
 %name WhyErased why
 
-export
-Functor WhyErased where
-  map f Placeholder = Placeholder
-  map f Impossible = Impossible
-  map f (Dotted x) = Dotted (f x)
+export %tcinline
+mapWhy : (a -> b) -> WhyErased a -> WhyErased b
+mapWhy f Placeholder = Placeholder
+mapWhy f Impossible = Impossible
+mapWhy f (Dotted x) = Dotted (f x)
+
+export %inline
+Functor WhyErased where map = mapWhy
 
 export
 Foldable WhyErased where
@@ -90,21 +101,20 @@ Traversable WhyErased where
   traverse f Impossible = pure Impossible
   traverse f (Dotted x) = Dotted <$> f x
 
-
-------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Core Terms
+--------------------------------------------------------------------------------
 
 public export
-data Term : Scoped where
-     Local : FC -> (isLet : Maybe Bool) ->
-             (idx : Nat) -> (0 p : IsVar name idx vars) -> Term vars
-     Ref : FC -> NameType -> (name : Name) -> Term vars
+data Term : Scope -> Type where
+     Local : FC -> (isLet : Maybe Bool) -> Var vs -> Term vs
+     Ref : FC -> NameType -> (name : Name) -> Term vs
      -- Metavariables and the scope they are applied to
-     Meta : FC -> Name -> Int -> List (Term vars) -> Term vars
+     Meta : FC -> Name -> Bits32 -> List (Term vs) -> Term vs
      Bind : FC -> (x : Name) ->
-            (b : Binder (Term vars)) ->
-            (scope : Term (Scope.bind vars x)) -> Term vars
-     App : FC -> (fn : Term vars) -> (arg : Term vars) -> Term vars
+            (b : Binder (Term vs)) ->
+            (scope : Term (Scope.bind vs x)) -> Term vs
+     App : FC -> (fn : Term vs) -> (arg : Term vs) -> Term vs
      -- as patterns; since we check LHS patterns as terms before turning
      -- them into patterns, this helps us get it right. When normalising,
      -- we just reduce the inner term and ignore the 'as' part
@@ -112,49 +122,82 @@ data Term : Scoped where
      -- easier this way since it gives us the ability to work with unresolved
      -- names (Ref) and resolved names (Local) without having to define a
      -- special purpose thing. (But it'd be nice to tidy that up, nevertheless)
-     As : FC -> UseSide -> (as : Term vars) -> (pat : Term vars) -> Term vars
+     As : FC -> UseSide -> (as : Term vs) -> (pat : Term vs) -> Term vs
      -- Typed laziness annotations
-     TDelayed : FC -> LazyReason -> Term vars -> Term vars
-     TDelay : FC -> LazyReason -> (ty : Term vars) -> (arg : Term vars) -> Term vars
-     TForce : FC -> LazyReason -> Term vars -> Term vars
-     PrimVal : FC -> (c : Constant) -> Term vars
-     Erased : FC -> WhyErased (Term vars) -> Term vars
+     TDelayed : FC -> LazyReason -> Term vs -> Term vs
+     TDelay : FC -> LazyReason -> (ty : Term vs) -> (arg : Term vs) -> Term vs
+     TForce : FC -> LazyReason -> Term vs -> Term vs
+     PrimVal : FC -> (c : Constant) -> Term vs
+     Erased : FC -> WhyErased (Term vs) -> Term vs
      TType : FC -> Name -> -- universe variable
-             Term vars
+             Term vs
 
+%runElab deriveIndexed "Term" [Show]
 %name Term t, u
 
 public export
 ClosedTerm : Type
 ClosedTerm = Term [<]
 
-------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Weakening
+--------------------------------------------------------------------------------
 
-export covering
-insertNames : GenWeakenable Term
-insertNames out ns (Local fc r idx prf)
-   = let MkNVar prf' = insertNVarNames out ns (MkNVar prf) in
-     Local fc r _ prf'
-insertNames out ns (Ref fc nt name) = Ref fc nt name
-insertNames out ns (Meta fc name idx args)
-    = Meta fc name idx (map (insertNames out ns) args)
-insertNames out ns (Bind fc x b scope)
-    = Bind fc x (assert_total (map (insertNames out ns) b))
-           (insertNames (suc out) ns scope)
-insertNames out ns (App fc fn arg)
-    = App fc (insertNames out ns fn) (insertNames out ns arg)
-insertNames out ns (As fc s as tm)
-    = As fc s (insertNames out ns as) (insertNames out ns tm)
-insertNames out ns (TDelayed fc r ty) = TDelayed fc r (insertNames out ns ty)
-insertNames out ns (TDelay fc r ty tm)
-    = TDelay fc r (insertNames out ns ty) (insertNames out ns tm)
-insertNames out ns (TForce fc r tm) = TForce fc r (insertNames out ns tm)
-insertNames out ns (PrimVal fc c) = PrimVal fc c
-insertNames out ns (Erased fc Impossible) = Erased fc Impossible
-insertNames out ns (Erased fc Placeholder) = Erased fc Placeholder
-insertNames out ns (Erased fc (Dotted t)) = Erased fc (Dotted (insertNames out ns t))
-insertNames out ns (TType fc u) = TType fc u
+insL : GenWeakenable (List . Term)
+
+insB : GenWeakenable (Binder . Term)
+
+insW : GenWeakenable (WhyErased . Term)
+
+insP : GenWeakenable (PiInfo . Term)
+
+insT : GenWeakenable Term
+insT o ns (Local fc r v)      = Local fc r $ genWeakenNs o ns v
+insT o ns (Ref fc nt name)    = Ref fc nt name
+insT o ns (Meta fc n m ts)    = Meta fc n m (insL o ns ts)
+insT o ns (Bind fc x b sc)    = Bind fc x (insB o ns b) (insT (suc o) ns sc)
+insT o ns (App fc fn x)       = App fc (insT o ns fn) (insT o ns x)
+insT o ns (As fc s as pat)    = As fc s (insT o ns as) (insT o ns pat)
+insT o ns (TDelayed fc lz t)  = TDelayed fc lz (insT o ns t)
+insT o ns (TDelay fc lz ty x) = TDelay fc lz (insT o ns ty) (insT o ns x)
+insT o ns (TForce fc lz t)    = TForce fc lz (insT o ns t)
+insT o ns (PrimVal fc c)      = PrimVal fc c
+insT o ns (Erased fc why)     = Erased fc (insW o ns why)
+insT o ns (TType fc n)        = TType fc n
+
+insL o ns []      = []
+insL o ns (t::ts) = insT o ns t :: insL o ns ts
+
+insW o n Placeholder = Placeholder
+insW o n Impossible = Impossible
+insW o n (Dotted x) = Dotted $ insT o n x
+
+insP o n Implicit = Implicit
+insP o n Explicit = Explicit
+insP o n AutoImplicit = AutoImplicit
+insP o n (DefImplicit x) = DefImplicit (insT o n x)
+
+insB o n (Lam fc r p t) = Lam fc r (insP o n p) (insT o n t)
+insB o n (Let fc r v t) = Let fc r (insT o n v) (insT o n t)
+insB o n (Pi fc r p t) = Pi fc r (insP o n p) (insT o n t)
+insB o n (PVar fc r p t) = PVar fc r (insP o n p) (insT o n t)
+insB o n (PLet fc r v t) = PLet fc r (insT o n v) (insT o n t)
+insB o n (PVTy fc r t) = PVTy fc r (insT o n t)
+
+export %inline
+GenWeaken Term where genWeakenNs = insT
+
+export %inline
+GenWeaken (PiInfo . Term) where genWeakenNs = insP
+
+export %inline
+GenWeaken (WhyErased . Term) where genWeakenNs = insW
+
+export %inline
+GenWeaken (Binder . Term) where genWeakenNs = insB
+
+export %inline
+GenWeaken (List . Term) where genWeakenNs = insL
 
 export
 compatTerm : CompatibleVars xs ys -> Term xs -> Term ys
@@ -180,160 +223,188 @@ compatTerm compat tm = believe_me tm -- no names in term, so it's identity
 -- compatTerm prf (PrimVal fc c) = PrimVal fc c
 -- compatTerm prf (Erased fc i) = Erased fc i
 -- compatTerm prf (TType fc) = TType fc
+--
 
+--------------------------------------------------------------------------------
+-- Shrinking
+--------------------------------------------------------------------------------
 
-mutual
-  export
-  shrinkPi : Shrinkable (PiInfo . Term)
-  shrinkPi pinfo th
-    = assert_total
-    $ traverse (\ t => shrinkTerm t th) pinfo
+shrL : Shrinkable (List . Term)
 
-  export
-  shrinkBinder : Shrinkable (Binder . Term)
-  shrinkBinder binder th
-    = assert_total
-    $ traverse (\ t => shrinkTerm t th) binder
+shrB : Shrinkable (Binder . Term)
 
-  export
-  shrinkTerms : Shrinkable (List . Term)
-  shrinkTerms ts th
-    = assert_total
-    $ traverse (\ t => shrinkTerm t th) ts
+shrW : Shrinkable (WhyErased . Term)
 
-  shrinkTerm : Shrinkable Term
-  shrinkTerm (Local fc r idx loc) prf
-    = do MkVar loc' <- shrinkIsVar loc prf
-         pure (Local fc r _ loc')
-  shrinkTerm (Ref fc x name) prf = Just (Ref fc x name)
-  shrinkTerm (Meta fc x y xs) prf
-     = do Just (Meta fc x y !(shrinkTerms xs prf))
-  shrinkTerm (Bind fc x b scope) prf
-     = Just (Bind fc x !(shrinkBinder b prf) !(shrinkTerm scope (Keep prf)))
-  shrinkTerm (App fc fn arg) prf
-     = Just (App fc !(shrinkTerm fn prf) !(shrinkTerm arg prf))
-  shrinkTerm (As fc s as tm) prf
-     = Just (As fc s !(shrinkTerm as prf) !(shrinkTerm tm prf))
-  shrinkTerm (TDelayed fc x y) prf
-     = Just (TDelayed fc x !(shrinkTerm y prf))
-  shrinkTerm (TDelay fc x t y) prf
-     = Just (TDelay fc x !(shrinkTerm t prf) !(shrinkTerm y prf))
-  shrinkTerm (TForce fc r x) prf
-     = Just (TForce fc r !(shrinkTerm x prf))
-  shrinkTerm (PrimVal fc c) prf = Just (PrimVal fc c)
-  shrinkTerm (Erased fc Placeholder) prf = Just (Erased fc Placeholder)
-  shrinkTerm (Erased fc Impossible) prf = Just (Erased fc Impossible)
-  shrinkTerm (Erased fc (Dotted t)) prf = Erased fc . Dotted <$> shrinkTerm t prf
-  shrinkTerm (TType fc u) prf = Just (TType fc u)
+shrP : Shrinkable (PiInfo . Term)
 
+shrT : Shrinkable Term
+shrT (Local fc r v) th      = Local fc r <$> shrink v th
+shrT (Ref fc nt name) th    = Just $ Ref fc nt name
+shrT (Meta fc n m ts) th    = Meta fc n m <$> shrL ts th
+shrT (Bind fc x b sc) th    = Bind fc x  <$> shrB b th <*> shrT sc (Keep th)
+shrT (App fc fn x) th       = App fc <$> shrT fn th <*> shrT x th
+shrT (As fc s as pat) th    = As fc s <$> shrT as th <*> shrT pat th
+shrT (TDelayed fc lz t) th  = TDelayed fc lz <$> shrT t th
+shrT (TDelay fc lz ty x) th = TDelay fc lz <$> shrT ty th <*> shrT x th
+shrT (TForce fc lz t) th    = TForce fc lz <$> shrT t th
+shrT (PrimVal fc c) th      = Just $ PrimVal fc c
+shrT (Erased fc why) th     = Erased fc <$> shrW why th
+shrT (TType fc n) th        = Just $ TType fc n
 
-mutual
-  export
-  thinPi : Thinnable (PiInfo . Term)
-  thinPi pinfo th = assert_total $ map (\ t => thinTerm t th) pinfo
+shrL []      th = Just []
+shrL (t::ts) th = [| shrT t th :: shrL ts th |]
 
-  export
-  thinBinder : Thinnable (Binder . Term)
-  thinBinder binder th = assert_total $ map (\ t => thinTerm t th) binder
+shrW Placeholder th = Just Placeholder
+shrW Impossible  th = Just Impossible
+shrW (Dotted x)  th = Dotted <$> shrT x th
 
-  export
-  thinTerms : Thinnable (List . Term)
-  thinTerms ts th = assert_total $ map (\ t => thinTerm t th) ts
+shrP Implicit        th = Just Implicit
+shrP Explicit        th = Just Explicit
+shrP AutoImplicit    th = Just AutoImplicit
+shrP (DefImplicit x) th = DefImplicit <$> shrT x th
 
-  thinTerm : Thinnable Term
-  thinTerm (Local fc x idx y) th
-      = let MkVar y' = thinIsVar y th in Local fc x _ y'
-  thinTerm (Ref fc x name) th = Ref fc x name
-  thinTerm (Meta fc x y xs) th
-      = Meta fc x y (thinTerms xs th)
-  thinTerm (Bind fc x b scope) th
-      = Bind fc x (thinBinder b th) (thinTerm scope (Keep th))
-  thinTerm (App fc fn arg) th
-      = App fc (thinTerm fn th) (thinTerm arg th)
-  thinTerm (As fc s nm pat) th
-      = As fc s (thinTerm nm th) (thinTerm pat th)
-  thinTerm (TDelayed fc x y) th = TDelayed fc x (thinTerm y th)
-  thinTerm (TDelay fc x t y) th
-      = TDelay fc x (thinTerm t th) (thinTerm y th)
-  thinTerm (TForce fc r x) th = TForce fc r (thinTerm x th)
-  thinTerm (PrimVal fc c) th = PrimVal fc c
-  thinTerm (Erased fc Impossible) th = Erased fc Impossible
-  thinTerm (Erased fc Placeholder) th = Erased fc Placeholder
-  thinTerm (Erased fc (Dotted t)) th = Erased fc (Dotted (thinTerm t th))
-  thinTerm (TType fc u) th = TType fc u
+shrB (Lam fc r p t)  th = Lam fc r  <$> shrP p th <*> shrT t th
+shrB (Let fc r v t)  th = Let fc r  <$> shrT v th <*> shrT t th
+shrB (Pi fc r p t)   th = Pi fc r   <$> shrP p th <*> shrT t th
+shrB (PVar fc r p t) th = PVar fc r <$> shrP p th <*> shrT t th
+shrB (PLet fc r v t) th = PLet fc r <$> shrT v th <*> shrT t th
+shrB (PVTy fc r t)   th = PVTy fc r <$> shrT t th
 
-export
-GenWeaken Term where
-  genWeakenNs = assert_total $ insertNames
+--------------------------------------------------------------------------------
+-- Thinning
+--------------------------------------------------------------------------------
 
-export
-%hint
-WeakenTerm : Weaken Term
-WeakenTerm = GenWeakenWeakens
+thiL : Thinnable (List . Term)
+
+thiB : Thinnable (Binder . Term)
+
+thiW : Thinnable (WhyErased . Term)
+
+thiP : Thinnable (PiInfo . Term)
+
+thiT : Thinnable Term
+thiT (Local fc r v) th      = Local fc r $ thin v th
+thiT (Ref fc nt name) th    = Ref fc nt name
+thiT (Meta fc n m ts) th    = Meta fc n m $ thiL ts th
+thiT (Bind fc x b sc) th    = Bind fc x  (thiB b th) (thiT sc (Keep th))
+thiT (App fc fn x) th       = App fc (thiT fn th) (thiT x th)
+thiT (As fc s as pat) th    = As fc s (thiT as th) (thiT pat th)
+thiT (TDelayed fc lz t) th  = TDelayed fc lz $ thiT t th
+thiT (TDelay fc lz ty x) th = TDelay fc lz (thiT ty th) (thiT x th)
+thiT (TForce fc lz t) th    = TForce fc lz $ thiT t th
+thiT (PrimVal fc c) th      = PrimVal fc c
+thiT (Erased fc why) th     = Erased fc $ thiW why th
+thiT (TType fc n) th        = TType fc n
+
+thiL []      th = []
+thiL (t::ts) th = thiT t th :: thiL ts th
+
+thiW Placeholder th = Placeholder
+thiW Impossible  th = Impossible
+thiW (Dotted x)  th = Dotted $ thiT x th
+
+thiP Implicit        th = Implicit
+thiP Explicit        th = Explicit
+thiP AutoImplicit    th = AutoImplicit
+thiP (DefImplicit x) th = DefImplicit $ thiT x th
+
+thiB (Lam fc r p t)  th = Lam fc r  (thiP p th) (thiT t th)
+thiB (Let fc r v t)  th = Let fc r  (thiT v th) (thiT t th)
+thiB (Pi fc r p t)   th = Pi fc r   (thiP p th) (thiT t th)
+thiB (PVar fc r p t) th = PVar fc r (thiP p th) (thiT t th)
+thiB (PLet fc r v t) th = PLet fc r (thiT v th) (thiT t th)
+thiB (PVTy fc r t)   th = PVTy fc r (thiT t th)
 
 export
 FreelyEmbeddable Term where
 
-export
+export %inline
 IsScoped Term where
-  shrink = shrinkTerm
-  thin = thinTerm
-  compatNs = compatTerm
+  shrink = shrT
+  thin = thiT
+  compatNs x = believe_me x
 
-------------------------------------------------------------------------
+export %inline
+IsScoped (List . Term) where
+  shrink = shrL
+  thin = thiL
+  compatNs x = believe_me x
+
+export %inline
+IsScoped (Binder . Term) where
+  shrink = shrB
+  thin = thiB
+  compatNs x = believe_me x
+
+export %inline
+IsScoped (PiInfo . Term) where
+  shrink = shrP
+  thin = thiP
+  compatNs x = believe_me x
+
+export %inline
+IsScoped (WhyErased . Term) where
+  shrink = shrW
+  thin = thiW
+  compatNs x = believe_me x
+
+--------------------------------------------------------------------------------
 -- Smart constructors
+--------------------------------------------------------------------------------
 
 export
-apply : FC -> Term vars -> List (Term vars) -> Term vars
+apply : FC -> Term vs -> List (Term vs) -> Term vs
 apply loc fn [] = fn
 apply loc fn (a :: args) = apply loc (App loc fn a) args
 
--- Creates a chain of `App` nodes, each with its own file context
+||| Creates a chain of `App` nodes, each with its own file context
 export
-applySpineWithFC : Term vars -> SnocList (FC, Term vars) -> Term vars
+applySpineWithFC : Term vs -> SnocList (FC, Term vs) -> Term vs
 applySpineWithFC fn [<] = fn
 applySpineWithFC fn (args :< (fc, arg)) = App fc (applySpineWithFC fn args) arg
 
--- Creates a chain of `App` nodes, each with its own file context
+||| Creates a chain of `App` nodes, each with its own file context
 export
-applyStackWithFC : Term vars -> List (FC, Term vars) -> Term vars
+applyStackWithFC : Term vs -> List (FC, Term vs) -> Term vs
 applyStackWithFC fn [] = fn
 applyStackWithFC fn ((fc, arg) :: args) = applyStackWithFC (App fc fn arg) args
 
--- Build a simple function type
+||| Build a simple function type
 export
-fnType : FC -> Term vars -> Term vars -> Term vars
-fnType fc arg scope = Bind EmptyFC (MN "_" 0) (Pi fc top Explicit arg) (weaken scope)
+fnType : FC -> Term vs -> Term vs -> Term vs
+fnType fc arg scope =
+  Bind EmptyFC (MN "_" 0) (Pi fc top Explicit arg) (weaken scope)
+
+||| Build a simple linear function type
+export
+linFnType : FC -> Term vs -> Term vs -> Term vs
+linFnType fc arg scope =
+  Bind EmptyFC (MN "_" 0) (Pi fc linear Explicit arg) (weaken scope)
 
 export
-linFnType : FC -> Term vars -> Term vars -> Term vars
-linFnType fc arg scope = Bind EmptyFC (MN "_" 0) (Pi fc linear Explicit arg) (weaken scope)
-
-export
-getFnArgs : Term vars -> (Term vars, List (Term vars))
+getFnArgs : Term vs -> (Term vs, List (Term vs))
 getFnArgs tm = getFA [] tm
   where
-    getFA : List (Term vars) -> Term vars ->
-            (Term vars, List (Term vars))
+    getFA : List (Term vs) -> Term vs -> (Term vs, List (Term vs))
     getFA args (App _ f a) = getFA (a :: args) f
     getFA args tm = (tm, args)
 
 export
-getFn : Term vars -> Term vars
+getFn : Term vs -> Term vs
 getFn (App _ f a) = getFn f
 getFn tm = tm
 
-export
-getArgs : Term vars -> (List (Term vars))
+export %inline
+getArgs : Term vs -> List (Term vs)
 getArgs = snd . getFnArgs
 
-
-------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Namespace manipulations
+--------------------------------------------------------------------------------
 
--- Remove/restore the given namespace from all Refs. This is to allow
--- writing terms and case trees to disk without repeating the same namespace
--- all over the place.
+||| Remove/restore the given namespace from all Refs. This is to allow
+||| writing terms and case trees to disk without repeating the same namespace
+||| all over the place.
 public export
 interface StripNamespace a where
   trimNS : Namespace -> a -> a
@@ -341,10 +412,9 @@ interface StripNamespace a where
 
 export
 StripNamespace Name where
-  trimNS ns nm@(NS tns n)
-    = if ns == tns then NS emptyNS n else nm
-      -- ^ A blank namespace, rather than a UN, so we don't catch primitive
-      -- names which are represented as UN.
+  trimNS ns nm@(NS tns n) = if ns == tns then NS emptyNS n else nm
+    -- ^ A blank namespace, rather than a UN, so we don't catch primitive
+    -- names which are represented as UN.
   trimNS ns nm = nm
 
   restoreNS ns nm@(NS tns n) =
@@ -353,53 +423,54 @@ StripNamespace Name where
       _   => nm
   restoreNS ns nm = nm
 
-export covering
-StripNamespace (Term vars) where
-  trimNS ns (Ref fc x nm)
-      = Ref fc x (trimNS ns nm)
-  trimNS ns (Meta fc x y xs)
-      = Meta fc x y (map (trimNS ns) xs)
-  trimNS ns (Bind fc x b scope)
-      = Bind fc x (map (trimNS ns) b) (trimNS ns scope)
-  trimNS ns (App fc fn arg)
-      = App fc (trimNS ns fn) (trimNS ns arg)
-  trimNS ns (As fc s p tm)
-      = As fc s (trimNS ns p) (trimNS ns tm)
-  trimNS ns (TDelayed fc x y)
-      = TDelayed fc x (trimNS ns y)
-  trimNS ns (TDelay fc x t y)
-      = TDelay fc x (trimNS ns t) (trimNS ns y)
-  trimNS ns (TForce fc r y)
-      = TForce fc r (trimNS ns y)
-  trimNS ns tm = tm
+adjL : (Name -> Name) -> List (Term vs) -> List (Term vs)
 
-  restoreNS ns (Ref fc x nm)
-      = Ref fc x (restoreNS ns nm)
-  restoreNS ns (Meta fc x y xs)
-      = Meta fc x y (map (restoreNS ns) xs)
-  restoreNS ns (Bind fc x b scope)
-      = Bind fc x (map (restoreNS ns) b) (restoreNS ns scope)
-  restoreNS ns (App fc fn arg)
-      = App fc (restoreNS ns fn) (restoreNS ns arg)
-  restoreNS ns (As fc s p tm)
-      = As fc s (restoreNS ns p) (restoreNS ns tm)
-  restoreNS ns (TDelayed fc x y)
-      = TDelayed fc x (restoreNS ns y)
-  restoreNS ns (TDelay fc x t y)
-      = TDelay fc x (restoreNS ns t) (restoreNS ns y)
-  restoreNS ns (TForce fc r y)
-      = TForce fc r (restoreNS ns y)
-  restoreNS ns tm = tm
+adjB : (Name -> Name) -> Binder (Term vs) -> Binder (Term vs)
 
+adjW : (Name -> Name) -> WhyErased (Term vs) -> WhyErased (Term vs)
+
+adjP : (Name -> Name) -> PiInfo (Term vs) -> PiInfo (Term vs)
+
+adjT : (Name -> Name) -> Term vs -> Term vs
+adjT f (Ref fc nt name)    = Ref fc nt (f name)
+adjT f (Meta fc n m ts)    = Meta fc n m $ adjL f ts
+adjT f (Bind fc x b sc)    = Bind fc x  (adjB f b) (adjT f sc)
+adjT f (App fc fn x)       = App fc (adjT f fn) (adjT f x)
+adjT f (As fc s as pat)    = As fc s (adjT f as) (adjT f pat)
+adjT f (TDelayed fc lz t)  = TDelayed fc lz $ adjT f t
+adjT f (TDelay fc lz ty x) = TDelay fc lz (adjT f ty) (adjT f x)
+adjT f (TForce fc lz t)    = TForce fc lz $ adjT f t
+adjT f x                   = x
+
+adjL f []      = []
+adjL f (t::ts) = adjT f t :: adjL f ts
+
+adjW f (Dotted x) = Dotted $ adjT f x
+adjW f x          = x
+
+adjP f (DefImplicit x) = DefImplicit $ adjT f x
+adjP f x               = x
+
+adjB f (Lam fc r p t)  = Lam fc r  (adjP f p) (adjT f t)
+adjB f (Let fc r v t)  = Let fc r  (adjT f v) (adjT f t)
+adjB f (Pi fc r p t)   = Pi fc r   (adjP f p) (adjT f t)
+adjB f (PVar fc r p t) = PVar fc r (adjP f p) (adjT f t)
+adjB f (PLet fc r v t) = PLet fc r (adjT f v) (adjT f t)
+adjB f (PVTy fc r t)   = PVTy fc r (adjT f t)
+
+export %inline
+StripNamespace (Term vs) where
+  trimNS = adjT . trimNS
+  restoreNS = adjT . restoreNS
 
 export
-isErased : Term vars -> Bool
+isErased : Term vs -> Bool
 isErased (Erased {}) = True
 isErased _ = False
 
 export
-getLoc : Term vars -> FC
-getLoc (Local fc _ _ _) = fc
+getLoc : Term vs -> FC
+getLoc (Local fc _ _) = fc
 getLoc (Ref fc _ _) = fc
 getLoc (Meta fc _ _ _) = fc
 getLoc (Bind fc _ _ _) = fc
@@ -413,31 +484,10 @@ getLoc (Erased fc i) = fc
 getLoc (TType fc _) = fc
 
 export
-Eq LazyReason where
-  (==) LInf LInf = True
-  (==) LLazy LLazy = True
-  (==) LUnknown LUnknown = True
-  (==) _ _ = False
-
-export
-Show LazyReason where
-    show LInf = "Inf"
-    show LLazy = "Lazy"
-    show LUnknown = "Unkown"
-
-export
 compatible : LazyReason -> LazyReason -> Bool
 compatible LUnknown _ = True
 compatible _ LUnknown = True
 compatible x y = x == y
-
-export
-total
-Eq a => Eq (WhyErased a) where
-  Placeholder == Placeholder = True
-  Impossible == Impossible = True
-  Dotted t == Dotted u = t == u
-  _ == _ = False
 
 export
 eqWhyErasedBy : (a -> b -> Bool) -> WhyErased a -> WhyErased b -> Bool
@@ -446,10 +496,9 @@ eqWhyErasedBy eq Placeholder Placeholder = True
 eqWhyErasedBy eq (Dotted t) (Dotted u) = eq t u
 eqWhyErasedBy eq _ _ = False
 
-export
-total
+export total
 eqTerm : Term vs -> Term vs' -> Bool
-eqTerm (Local _ _ idx _) (Local _ _ idx' _) = idx == idx'
+eqTerm (Local _ _ v) (Local _ _ v') = varIdx v == varIdx v'
 eqTerm (Ref _ _ n) (Ref _ _ n') = n == n'
 eqTerm (Meta _ _ i args) (Meta _ _ i' args')
     = i == i' && assert_total (all (uncurry eqTerm) (zip args args'))
@@ -465,95 +514,52 @@ eqTerm (Erased _ i) (Erased _ i') = assert_total (eqWhyErasedBy eqTerm i i')
 eqTerm (TType {}) (TType {}) = True
 eqTerm _ _ = False
 
-export
-total
-Eq (Term vars) where
-  (==) = eqTerm
+export %inline
+Eq (Term vs) where (==) = eqTerm
 
-------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Scope checking
+--------------------------------------------------------------------------------
 
-mutual
+rsvL : (vs : Scope) -> List (Term vs) -> List (Term vs)
 
-  resolveNamesBinder : (vars : Scope) -> Binder (Term vars) -> Binder (Term vars)
-  resolveNamesBinder vars b = assert_total $ map (resolveNames vars) b
+rsvB : (vs : Scope) -> Binder (Term vs) -> Binder (Term vs)
 
-  resolveNamesTerms : (vars : Scope) -> List (Term vars) -> List (Term vars)
-  resolveNamesTerms vars ts = assert_total $ map (resolveNames vars) ts
+rsvW : (vs : Scope) -> WhyErased (Term vs) -> WhyErased (Term vs)
 
-  -- Replace any Ref Bound in a type with appropriate local
-  export
-  resolveNames : (vars : Scope) -> Term vars -> Term vars
-  resolveNames vars (Ref fc Bound name)
-      = case isNVar name vars of
-             Just (MkNVar prf) => Local fc (Just False) _ prf
-             _ => Ref fc Bound name
-  resolveNames vars (Meta fc n i xs)
-      = Meta fc n i (resolveNamesTerms vars xs)
-  resolveNames vars (Bind fc x b scope)
-      = Bind fc x (resolveNamesBinder vars b) (resolveNames (vars:<x) scope)
-  resolveNames vars (App fc fn arg)
-      = App fc (resolveNames vars fn) (resolveNames vars arg)
-  resolveNames vars (As fc s as pat)
-      = As fc s (resolveNames vars as) (resolveNames vars pat)
-  resolveNames vars (TDelayed fc x y)
-      = TDelayed fc x (resolveNames vars y)
-  resolveNames vars (TDelay fc x t y)
-      = TDelay fc x (resolveNames vars t) (resolveNames vars y)
-  resolveNames vars (TForce fc r x)
-      = TForce fc r (resolveNames vars x)
-  resolveNames vars tm = tm
+rsvP : (vs : Scope) -> PiInfo (Term vs) -> PiInfo (Term vs)
 
-------------------------------------------------------------------------
--- Showing
+rsvT : (vs : Scope) -> Term vs -> Term vs
+rsvT vs (Ref fc Bound name)    =
+  case isNVar name vs of
+    Nothing => Ref fc Bound name
+    Just x  => Local fc (Just False) (forgetName x)
+rsvT vs (Meta fc n m ts)    = Meta fc n m $ rsvL vs ts
+rsvT vs (Bind fc x b sc)    = Bind fc x  (rsvB vs b) (rsvT (vs:<x) sc)
+rsvT vs (App fc fn x)       = App fc (rsvT vs fn) (rsvT vs x)
+rsvT vs (As fc s as pat)    = As fc s (rsvT vs as) (rsvT vs pat)
+rsvT vs (TDelayed fc lz t)  = TDelayed fc lz $ rsvT vs t
+rsvT vs (TDelay fc lz ty x) = TDelay fc lz (rsvT vs ty) (rsvT vs x)
+rsvT vs (TForce fc lz t)    = TForce fc lz $ rsvT vs t
+rsvT vs x                   = x
 
-export
-withPiInfo : Show t => PiInfo t -> String -> String
-withPiInfo Explicit tm = "(" ++ tm ++ ")"
-withPiInfo Implicit tm = "{" ++ tm ++ "}"
-withPiInfo AutoImplicit tm = "{auto " ++ tm ++ "}"
-withPiInfo (DefImplicit t) tm = "{default " ++ show t ++ " " ++ tm ++ "}"
+rsvL vs []      = []
+rsvL vs (t::ts) = rsvT vs t :: rsvL vs ts
 
-export
-covering
-{vars : _} -> Show (Term vars) where
-  show tm = let (fn, args) = getFnArgs tm in showApp fn args
-    where
-      showApp : {vars : _} -> Term vars -> List (Term vars) -> String
-      showApp (Local _ c idx p) []
-         = show (nameAt p) ++ "[" ++ show idx ++ "]"
+rsvW vs (Dotted x) = Dotted $ rsvT vs x
+rsvW vs x          = x
 
-      showApp (Ref _ _ n) [] = show n
-      showApp (Meta _ n _ args) []
-          = "?" ++ show n ++ "_" ++ show args
-      showApp (Bind _ x (Lam _ c info ty) sc) []
-          = "\\" ++ withPiInfo info (showCount c ++ show x ++ " : " ++ show ty) ++
-            " => " ++ show sc
-      showApp (Bind _ x (Let _ c val ty) sc) []
-          = "let " ++ showCount c ++ show x ++ " : " ++ show ty ++
-            " = " ++ show val ++ " in " ++ show sc
-      showApp (Bind _ x (Pi _ c info ty) sc) []
-          = withPiInfo info (showCount c ++ show x ++ " : " ++ show ty) ++
-            " -> " ++ show sc
-      showApp (Bind _ x (PVar _ c info ty) sc) []
-          = withPiInfo info ("pat " ++ showCount c ++ show x ++ " : " ++ show ty) ++
-            " => " ++ show sc
-      showApp (Bind _ x (PLet _ c val ty) sc) []
-          = "plet " ++ showCount c ++ show x ++ " : " ++ show ty ++
-            " = " ++ show val ++ " in " ++ show sc
-      showApp (Bind _ x (PVTy _ c ty) sc) []
-          = "pty " ++ showCount c ++ show x ++ " : " ++ show ty ++
-            " => " ++ show sc
-      showApp (App {}) [] = "[can't happen]"
-      showApp (As _ _ n tm) [] = show n ++ "@" ++ show tm
-      showApp (TDelayed _ _ tm) [] = "%Delayed " ++ show tm
-      showApp (TDelay _ _ _ tm) [] = "%Delay " ++ show tm
-      showApp (TForce _ _ tm) [] = "%Force " ++ show tm
-      showApp (PrimVal _ c) [] = show c
-      showApp (Erased _ (Dotted t)) [] = ".(" ++ show t ++ ")"
-      showApp (Erased {}) [] = "[__]"
-      showApp (TType _ u) [] = "Type"
-      showApp _ [] = "???"
-      showApp f args = "(" ++ assert_total (show f) ++ " " ++
-                        assert_total (unwords (map show args))
-                     ++ ")"
+rsvP vs (DefImplicit x) = DefImplicit $ rsvT vs x
+rsvP vs x               = x
+
+rsvB vs (Lam fc r p t)  = Lam fc r  (rsvP vs p) (rsvT vs t)
+rsvB vs (Let fc r v t)  = Let fc r  (rsvT vs v) (rsvT vs t)
+rsvB vs (Pi fc r p t)   = Pi fc r   (rsvP vs p) (rsvT vs t)
+rsvB vs (PVar fc r p t) = PVar fc r (rsvP vs p) (rsvT vs t)
+rsvB vs (PLet fc r v t) = PLet fc r (rsvT vs v) (rsvT vs t)
+rsvB vs (PVTy fc r t)   = PVTy fc r (rsvT vs t)
+
+||| Replace any Ref Bound in a type with appropriate local
+export %inline
+resolveNames : (vs : Scope) -> Term vs -> Term vs
+resolveNames = rsvT
