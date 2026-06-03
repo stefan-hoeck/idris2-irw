@@ -7,3 +7,5 @@ depends = irw-core
 sourcedir = "src"
 
 modules = Gen.Name
+        , Property.Eq
+        , Property.HDecEq

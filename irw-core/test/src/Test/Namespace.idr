@@ -1,7 +1,7 @@
 module Test.Namespace
 
-import Data.List.Quantifiers
 import Gen.Name
+import Property.HDecEq
 import IRW.Libs.Data.String.Extra
 
 %default total
@@ -38,6 +38,9 @@ prop_isApproximationOf =
     assert $ isApproximationOf "List.Properties" "Data.List.Properties"
     assert $ not $ isApproximationOf "Data.List.Properties" "List.Properties"
 
+prop_hdecEq : Property
+prop_hdecEq = hdecEqLaw namespaces
+
 export
 props : Group
 props =
@@ -47,4 +50,5 @@ props =
     , ("prop_allParents", prop_allParents)
     , ("prop_allParentsSize", prop_allParentsSize)
     , ("prop_isApproximationOf", prop_isApproximationOf)
+    , ("prop_hdecEq", prop_hdecEq)
     ]
