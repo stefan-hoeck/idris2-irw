@@ -6,9 +6,6 @@ import IRW.Libs.Data.String.Extra
 
 %default total
 
-%inline
-FromString Namespace where fromString = mkNamespace
-
 prop_mkNamespace : Property
 prop_mkNamespace =
   property $ do

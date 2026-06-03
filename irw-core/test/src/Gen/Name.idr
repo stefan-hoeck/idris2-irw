@@ -6,6 +6,21 @@ import Data.Vect
 
 %default total
 
+export %inline
+FromString Namespace where
+  fromString = mkNamespace
+
+export %inline
+FromString UserName where
+  fromString = mkUserName
+
+export
+FromString Name where
+  fromString s =
+    case mkNamespacedIdent s of
+      (Just ns,y) => NS ns (UN $ fromString y)
+      (_,y)       => UN $ fromString y
+
 ||| Alpha-numeric, underscore ('_'), or single quote ('\'')
 export
 identChar : Gen Char
