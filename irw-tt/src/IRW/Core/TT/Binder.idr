@@ -104,26 +104,26 @@ public export
 data Binder : Type -> Type where
 
      ||| Lambda bound variables with their implicitness
-     Lam : FC -> RigCount -> PiInfo type -> (ty : type) -> Binder type
+     Lam : FC -> RigCount -> PiInfo t -> (ty : t) -> Binder t
 
      ||| Let bound variables with their value
-     Let : FC -> RigCount -> (val : type) -> (ty : type) -> Binder type
+     Let : FC -> RigCount -> (val : t) -> (ty : t) -> Binder t
 
      |||Forall/pi bound variables with their implicitness
-     Pi : FC -> RigCount -> PiInfo type -> (ty : type) -> Binder type
+     Pi : FC -> RigCount -> PiInfo t -> (ty : t) -> Binder t
 
      ||| Pattern bound variables. The PiInfo gives the implicitness at the
      ||| point it was bound (Explicit if it was explicitly named in the
      ||| program)
-     PVar : FC -> RigCount -> PiInfo type -> (ty : type) -> Binder type
+     PVar : FC -> RigCount -> PiInfo t -> (ty : t) -> Binder t
 
      ||| Variable bound for an as pattern (Like a let, but no computational
      ||| force, and only used on the lhs. Converted to a let on the rhs because
      ||| we want the computational behaviour.)
-     PLet : FC -> RigCount -> (val : type) -> (ty : type) -> Binder type
+     PLet : FC -> RigCount -> (val : t) -> (ty : t) -> Binder t
 
      ||| The type of pattern bound variables
-     PVTy : FC -> RigCount -> (ty : type) -> Binder type
+     PVTy : FC -> RigCount -> (ty : t) -> Binder t
 
 %runElab derive "Binder" [Show]
 
