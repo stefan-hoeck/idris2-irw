@@ -491,7 +491,7 @@ addRefs :
      (underAssert : Bool)
   -> (aTotal : Name)
   -> NameMap Bool
-  -> Term vars
+  -> Term vs
   -> NameMap Bool
 addRefs = refT
 
@@ -499,5 +499,5 @@ addRefs = refT
 ||| 'assert_total' because we may need to know that in coverage/totality
 ||| checking
 export %inline
-getRefs : (aTotal : Name) -> Term vars -> NameMap Bool
+getRefs : (aTotal : Name) -> Term vs -> NameMap Bool
 getRefs at = addRefs False at empty
