@@ -143,3 +143,12 @@ popNs = flip shiftR
 export %inline
 addZ : NatSet -> NatSet
 addZ = (`shiftL` 1)
+
+||| `(outer ++ local)` -> `(outer ++ ns ++ local)`
+export
+genWeaken : (local, ns : Nat) -> NatSet -> NatSet
+genWeaken 0     ns s = s `shiftL` ns
+genWeaken local ns s =
+ let loc   = s .&. ((1 `shiftL` local) - 1)
+     outer = s - loc
+  in (outer `shiftL` ns) + loc

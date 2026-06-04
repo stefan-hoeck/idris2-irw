@@ -176,8 +176,6 @@ TODO
   Libraries.Data.StringTrie
   Libraries.Data.Tap
   Libraries.Data.UserNameMap
-  Libraries.Data.VarSet
-  Libraries.Data.VarSet.Core
   Libraries.Data.Version
   Libraries.Data.WithDefault
   Libraries.Data.WithData
@@ -318,6 +316,8 @@ Done
   Libraries.Data.IOMatrix                                  -- use lib array
   Libraries.Data.Ordering.Extra
   Libraries.Data.String                                    -- ditched, now in base
+  Libraries.Data.VarSet                                    -- moved to IRW.Core.TT.VarSet
+  Libraries.Data.VarSet.Core                               -- merged with VarSet
   Libraries.Decidable.Equality                             -- ditched, we use Maybe0 from algebra
   Libraries.Text.Bounded                                   -- use lib ilex-core
   Libraries.Text.Distance.Levenshtein
