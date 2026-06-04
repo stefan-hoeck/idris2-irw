@@ -11,6 +11,7 @@ modules = IRW.Algebra
         , IRW.Algebra.SizeChange
         , IRW.Algebra.ZeroOneOmega
 
+        , IRW.Core.TT
         , IRW.Core.TT.Binder
         , IRW.Core.TT.Primitive
         , IRW.Core.TT.Subst

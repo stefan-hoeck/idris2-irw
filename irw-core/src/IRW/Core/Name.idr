@@ -2,6 +2,7 @@ module IRW.Core.Name
 
 import Data.Maybe0 as M0
 import Data.SnocList
+import Data.SortedMap
 import Decidable.HDecEq
 import Derive.Prelude
 import IRW.Libs.Data.String.Extra
@@ -54,6 +55,10 @@ data Name : Type where
 %runElab derive "IRW.Core.Name.Name" [Show,Eq,Ord]
 
 %name Name n
+
+public export
+0 NameMap : Type -> Type
+NameMap = SortedMap Name
 
 export
 mkNamespacedName : Maybe Namespace -> UserName -> Name
