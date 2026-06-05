@@ -5,9 +5,13 @@ import Data.Either0
 import Data.Fin
 import Data.So
 import Decidable.HDecEq
+import Derive.Prelude
 import IRW.Core.Name.Scoped
 
 %default total
+%language ElabReflection
+%hide Language.Reflection.TT.IsVar
+%hide Language.Reflection.TT.Name
 
 --------------------------------------------------------------------------------
 -- IsVar Predicate
@@ -457,8 +461,9 @@ export %inline
 FreelyEmbeddable (NVar {a = Name} nm) where
   embed (MkNVar p) = MkNVar (embedIsVar p)
 
-------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Corollaries
+--------------------------------------------------------------------------------
 
 ||| Moving the zeroth variable under a set number of variables
 export
@@ -469,3 +474,15 @@ shiftUnderNs :
   -> NVar n (outer :< x ++ inner)
 shiftUnderNs s First = weakenNs s (MkNVar First)
 shiftUnderNs s (Later p) = insertNVar s (MkNVar p)
+
+--------------------------------------------------------------------------------
+-- Sigma Wrappers
+--------------------------------------------------------------------------------
+
+public export
+record AnyVar where
+  constructor AV
+  scope : Scope
+  var   : Var scope
+
+%runElab derive "AnyVar" [Show]

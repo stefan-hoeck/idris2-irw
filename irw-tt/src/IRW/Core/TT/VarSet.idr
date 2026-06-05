@@ -1,17 +1,23 @@
 module IRW.Core.TT.VarSet
 
 import Data.Bits
+import Derive.Prelude
 import IRW.Core.Name.Scoped
 import IRW.Core.TT.Var
 import IRW.Libs.Data.NatSet
 import IRW.Libs.Data.SizeOf
 
 %default total
+%language ElabReflection
+%hide Language.Reflection.TT.IsVar
+%hide Language.Reflection.TT.Name
 
 export
 record VarSet (vs : Scope) where
   constructor VS
   vars : NatSet
+
+%runElab deriveIndexed "VarSet" [Show]
 
 export %inline
 empty : VarSet vs
@@ -57,6 +63,10 @@ export %inline
 toList : {vs : Scope} -> VarSet vs -> List (Var vs)
 toList = mapMaybe (`isDeBruijn` vs) . NatSet.toList . vars
 
+export %inline
+fromList : List (Var vs) -> VarSet vs
+fromList = foldl (flip insert) empty
+
 ||| Pop the zero (whether or not in the set) and shift all the
 ||| other positions by -1 (useful when coming back from under
 ||| a binder)
@@ -92,3 +102,15 @@ fromVarSet (ns:<n) xs =
     if first `VarSet.elem` xs
       then (_ ** Keep svs)
       else (_ ** Drop svs)
+
+--------------------------------------------------------------------------------
+-- Sigma Wrappers
+--------------------------------------------------------------------------------
+
+public export
+record AnyVarSet where
+  constructor AVS
+  scope : Scope
+  var   : VarSet scope
+
+%runElab derive "AnyVarSet" [Show]
