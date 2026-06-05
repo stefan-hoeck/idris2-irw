@@ -56,7 +56,6 @@ TODO
   Core.Core
   Core.Coverage
   Core.Directory
-  Core.Env
   Core.GetType
   Core.Hash
   Core.InitPrimitives
@@ -297,6 +296,7 @@ Done
   Core.Name.CompatibleVars                                 -- now part of Core.Name.Scoped
   Core.Name.Namespace
   Core.Name.Scoped
+  Core.Env
   Core.FC
   Core.TT.Binder
   Core.TT.Primitive
