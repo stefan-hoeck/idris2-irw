@@ -7,6 +7,7 @@ import IRW.Core.TT.VarSet
 import IRW.Libs.Data.SizeOf
 
 %default total
+%hide Data.List.revOnto
 
 ||| Environment containing types and values of local variables
 public export
@@ -110,9 +111,9 @@ getBinderUnder :
   -> Binder (tm (reverseOnto vars ns))
 getBinderUnder {idx = Z} {vars = vs:<v} ns First (env:<b) =
   let res := map (weakenNs (reverse (mkSizeOf (ns:<v)))) b
-   in ?fooo
-  -- rewrite revOnto vs (ns:<v)
-  -- in map (weakenNs (reverse (mkSizeOf (ns:<v)))) b
+      re2 := replace {p = \x => Binder (tm (vs ++ x))} (revOnto [<v] ns) res
+      re3 := replace {p = \x => Binder (tm x)} (appendAssociative _ _ _) re2
+   in replace {p = \x => Binder (tm x)} (sym $ revOnto _ _) re3
 getBinderUnder {idx = S k} {vars = vs:<v} ns (Later lp) (env:<b) =
   getBinderUnder (ns:<v) lp env
 
