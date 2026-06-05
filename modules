@@ -56,7 +56,6 @@ TODO
   Core.Core
   Core.Coverage
   Core.Directory
-  Core.Env
   Core.GetType
   Core.Hash
   Core.InitPrimitives
@@ -78,8 +77,6 @@ TODO
   Core.Termination.References
   Core.Termination
   Core.Transform
-  Core.TT
-  Core.TT.Term.Subst
   Core.TT.Traversals
   Core.TT.Views
   Core.TTC
@@ -155,7 +152,6 @@ TODO
   Libraries.Data.DList
   Libraries.Data.Graph
   Libraries.Data.IMaybe
-  Libraries.Data.IntMap
   Libraries.Data.List.Extra
   Libraries.Data.List.LengthMatch
   Libraries.Data.List.Quantifiers.Extra
@@ -165,17 +161,13 @@ TODO
   Libraries.Data.PosMap
   Libraries.Data.Record
   Libraries.Data.SnocList.Extra
-  Libraries.Data.SnocList.HasLength
   Libraries.Data.SnocList.LengthMatch
-  Libraries.Data.SnocList.SizeOf
   Libraries.Data.Span
   Libraries.Data.SparseMatrix
   Libraries.Data.String.Builder
   Libraries.Data.String.Iterator
-  Libraries.Data.StringMap
   Libraries.Data.StringTrie
   Libraries.Data.Tap
-  Libraries.Data.UserNameMap
   Libraries.Data.Version
   Libraries.Data.WithDefault
   Libraries.Data.WithData
@@ -297,6 +289,7 @@ Done
   Core.Name.CompatibleVars                                 -- now part of Core.Name.Scoped
   Core.Name.Namespace
   Core.Name.Scoped
+  Core.Env
   Core.FC
   Core.TT.Binder
   Core.TT.Primitive
@@ -308,6 +301,7 @@ Done
   Libraries.Control.ANSI.CSI                               -- use lib ansi
   Libraries.Control.ANSI.SGR                               -- use lib ansi
   Libraries.Data.Erased                                    -- ditched, using Maybe0 and Either0 from algebra instead
+  Libraries.Data.IntMap                                    -- ditched, use SortedMap instead?
   Libraries.Data.List.HasLength                            -- moved as private utility to Libraries.Data.List.SizeOf
   Libraries.Data.List.SizeOf
   Libraries.Data.List.Thin
@@ -316,6 +310,8 @@ Done
   Libraries.Data.IOMatrix                                  -- use lib array
   Libraries.Data.Ordering.Extra
   Libraries.Data.String                                    -- ditched, now in base
+  Libraries.Data.StringMap                                 -- ditched, use SortedMap instead?
+  Libraries.Data.UserNameMap                               -- ditched, use SortedMap instead?
   Libraries.Data.VarSet                                    -- moved to IRW.Core.TT.VarSet
   Libraries.Data.VarSet.Core                               -- merged with VarSet
   Libraries.Decidable.Equality                             -- ditched, we use Maybe0 from algebra
