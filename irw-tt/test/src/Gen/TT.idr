@@ -10,14 +10,9 @@ import public IRW.Core.TT.Binder
 import public IRW.Core.TT.Primitive
 import public IRW.Core.TT.Term
 import public IRW.Core.TT.Var
+import public IRW.Core.TT.VarSet
 
 %default total
-
-public export
-record AnyVar where
-  constructor AV
-  scope : Scope
-  var   : Var scope
 
 -- Only trivial file contexts at the moment
 export
@@ -29,11 +24,38 @@ rigCounts : Gen ZeroOneOmega
 rigCounts = element [erased,linear,top]
 
 export
+vars1 : (vs : Scope) -> (n : Name) -> Gen (Var $ vs:<n)
+vars1 vs n =
+  case allVars (vs:<n) <>> [] of
+    [] => pure first
+    h::t => element (h :: fromList t)
+
+export
+anyVars : Gen AnyVar
+anyVars =
+  snocList (linear 1 10) names >>= \case
+    [<]   => pure $ AV [<"foo"] first
+    sn:<n => map (\x => AV (sn:<n) x) (vars1 sn n)
+
+export
 vars : (vs : Scope) -> Maybe (Gen $ Var vs)
 vars vs =
   case allVars vs <>> [] of
     [] => Nothing
     h::t => Just $ element (h :: fromList t)
+
+export
+varSets : (vs : Scope) -> (n : Name) -> Gen (VarSet $ vs:<n)
+varSets vs n =
+ let gv := vars1 vs n
+  in fromList <$> list (linear 0 20) gv
+
+export
+anyVarSet : Gen AnyVarSet
+anyVarSet =
+  snocList (linear 1 10) names >>= \case
+    [<]   => pure $ AVS [<] empty
+    sn:<n => map (\x => AVS _ x) (varSets sn n)
 
 --------------------------------------------------------------------------------
 -- Primitives and Constants
