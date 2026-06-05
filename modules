@@ -161,9 +161,7 @@ TODO
   Libraries.Data.PosMap
   Libraries.Data.Record
   Libraries.Data.SnocList.Extra
-  Libraries.Data.SnocList.HasLength
   Libraries.Data.SnocList.LengthMatch
-  Libraries.Data.SnocList.SizeOf
   Libraries.Data.Span
   Libraries.Data.SparseMatrix
   Libraries.Data.String.Builder
