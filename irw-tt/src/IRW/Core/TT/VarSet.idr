@@ -81,7 +81,6 @@ dropInner p (VS v) = VS $ NatSet.popNs p.size v
 export
 FreelyEmbeddable VarSet where
 
--- TODO: This is new and must be tested
 export
 GenWeaken VarSet where
   genWeakenNs x y (VS v) = VS $ genWeaken x.size y.size v
