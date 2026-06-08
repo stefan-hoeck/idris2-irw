@@ -22,11 +22,11 @@ empty : Env tm Scope.empty
 empty = [<]
 
 export
-extend : (x : Name) -> Env tm vs -> Binder (tm vs) -> Env tm (vs:<x)
+extend : (x : VarName) -> Env tm vs -> Binder (tm vs) -> Env tm (vs:<x)
 extend x = (:<) {x}
 
 export
-(++) : {ns : _} -> Env Term ns -> Env Term vs -> Env Term (ns ++ vs)
+(++) : {ns : _} -> Env (Term n) ns -> Env (Term n) vs -> Env (Term n) (ns ++ vs)
 (++) e (bs:<b) = (e++bs) :< map embed b
 (++) e [<]     = e
 
@@ -48,7 +48,7 @@ lengthExplicitPi (rho :< Pi _ _ Explicit _) = S (lengthExplicitPi rho)
 lengthExplicitPi (rho :< _)                 = lengthExplicitPi rho
 
 export
-namesNoLet : {xs : _} -> Env tm xs -> SnocList Name
+namesNoLet : {xs : _} -> Env tm xs -> Scope
 namesNoLet [<] = [<]
 namesNoLet (xs :< Let {}) = namesNoLet xs
 namesNoLet {xs = _ :< x} (env:<_) = namesNoLet env :< x
@@ -73,25 +73,25 @@ getErased env = go env zero
          else go bs (suc p)
 
 public export
-data IsDefined : Name -> Scope -> Type where
+data IsDefined : VarName -> Scope -> Type where
   IsDef : {idx : _} -> RigCount -> (0 p : IsVar n idx vs) -> IsDefined n vs
 
 export
 defined :
      {vars : _}
-  -> (n : Name)
-  -> Env Term vars
-  -> Maybe0 (IsDefined n vars)
-defined n [<] = Nothing0
-defined {vars = xs:<x} n (env:<b) =
-  case hdecEq n x of
-    Nothing0 => map(\(IsDef r p) => IsDef r (Later p)) (defined n env)
+  -> (v : VarName)
+  -> Env (Term n) vars
+  -> Maybe0 (IsDefined v vars)
+defined v [<] = Nothing0
+defined {vars = xs:<x} v (env:<b) =
+  case hdecEq v x of
+    Nothing0 => map(\(IsDef r p) => IsDef r (Later p)) (defined v env)
     Just0 p  => Just0 $ rewrite p in IsDef (multiplicity b) First
 
 ||| Bind additional pattern variables in an LHS, when checking an LHS in an
 ||| outer environment
 export
-bindEnv : {vs : _} -> FC -> Env Term vs -> (tm : Term vs) -> ClosedTerm
+bindEnv : {vs : _} -> FC -> Env (Term n) vs -> (tm : Term n vs) -> Term n [<]
 bindEnv loc [<]      tm = tm
 bindEnv loc (env:<b) tm =
   bindEnv loc env $
@@ -140,9 +140,9 @@ export
 abstractEnvType :
      {vars : _}
   -> FC
-  -> Env Term vars
-  -> (tm : Term vars)
-  -> ClosedTerm
+  -> Env (Term n) vars
+  -> (tm : Term n vars)
+  -> Term n [<]
 abstractEnvType fc [<] tm = tm
 abstractEnvType fc (env :< Let fc' c val ty) tm =
   abstractEnvType fc env (Bind fc _ (Let fc' c val ty) tm)
@@ -157,9 +157,9 @@ export
 abstractEnv :
      {vars : _}
   -> FC
-  -> Env Term vars
-  -> (tm : Term vars)
-  -> ClosedTerm
+  -> Env (Term n) vars
+  -> (tm : Term n vars)
+  -> Term n [<]
 abstractEnv fc [<] tm = tm
 abstractEnv fc (env :< Let fc' c val ty) tm =
   abstractEnv fc env (Bind fc _ (Let fc' c val ty) tm)
@@ -172,9 +172,9 @@ export
 abstractFullEnvType :
      {vars : _}
   -> FC
-  -> Env Term vars
-  -> (tm : Term vars)
-  -> ClosedTerm
+  -> Env (Term n) vars
+  -> (tm : Term n vars)
+  -> Term n [<]
 abstractFullEnvType fc [<] tm = tm
 abstractFullEnvType fc (env :< Pi fc' c e ty) tm =
   abstractFullEnvType fc env (Bind fc _ (Pi fc' c e ty) tm)
@@ -183,43 +183,43 @@ abstractFullEnvType fc (env :< b) tm =
    in abstractFullEnvType fc env (Bind fc _ bnd tm)
 
 export
-mkExplicit : Env Term vs -> Env Term vs
+mkExplicit : Env (Term n) vs -> Env (Term n) vs
 mkExplicit [<] = Env.empty
 mkExplicit (env :< Pi fc c _ ty) = mkExplicit env :< Pi fc c Explicit ty
 mkExplicit (env :< b) = mkExplicit env :< b
 
 export
-letToLam : Env Term vs -> Env Term vs
+letToLam : Env (Term n) vs -> Env (Term n) vs
 letToLam [<] = [<]
 letToLam (env :< Let fc c val ty) = letToLam env :< Lam fc c Explicit ty
 letToLam (env :< b) = letToLam env :< b
 
 findUsed :
      {vars : _}
-  -> Env Term vars
+  -> Env (Term n) vars
   -> VarSet vars
-  -> Term vars
+  -> Term n vars
   -> VarSet vars
 
 findUsedL :
      {vars : _}
-  -> Env Term vars
+  -> Env (Term n) vars
   -> VarSet vars
-  -> List (Term vars)
+  -> List (Term n vars)
   -> VarSet vars
 
 findUsedB :
      {vars : _}
-  -> Env Term vars
+  -> Env (Term n) vars
   -> VarSet vars
-  -> Binder (Term vars)
+  -> Binder (Term n vars)
   -> VarSet vars
 
 findUsed env used (Local fc r v) =
   assert_total $ if v `elem` used
      then used
      else findUsedB env (insert v used) (getBinder v env)
-findUsed env used (Meta _ _ _ args) = findUsedL env used args
+findUsed env used (Meta _ _ args) = findUsedL env used args
 findUsed env used (Bind fc x b tm)  =
   assert_total $
     VarSet.dropFirst $ findUsed (env :< b)
@@ -242,8 +242,8 @@ findUsedL env used (a::as) = findUsedL env (findUsed env used a) as
 export %inline
 findUsedLocs :
      {vars : _}
-  -> Env Term vars
-  -> Term vars
+  -> Env (Term n) vars
+  -> Term n vars
   -> VarSet vars
 findUsedLocs env tm = findUsed env VarSet.empty tm
 
@@ -270,22 +270,22 @@ mkShrink {vars = vs:<v} xs = mkShrinkSub _ xs
 export
 findSubEnv :
      {vars : _}
-  -> Env Term vars
-  -> Term vars
+  -> Env (Term n) vars
+  -> Term n vars
   -> (vars' : Scope ** Thin vars' vars)
 findSubEnv env tm = mkShrink (findUsedLocs env tm)
 
 export
-shrinkEnv : Env Term vs -> Thin newvars vs -> Maybe (Env Term newvars)
+shrinkEnv : Env (Term n) vs -> Thin newvars vs -> Maybe (Env (Term n) newvars)
 shrinkEnv env Refl = Just env
 shrinkEnv (env:<b) (Drop p) = shrinkEnv env p
 shrinkEnv (env:<b) (Keep p) = do
   env' <- shrinkEnv env p
-  b' <- assert_total (shrink {tm = Binder . Term} b p)
+  b' <- assert_total (shrink {tm = Binder . Term n} b p)
   pure (env' :< b')
 
 export
-mkEnvOnto : FC -> (xs : SnocList Name) -> Env Term ys -> Env Term (ys ++ xs)
+mkEnvOnto : FC -> (xs : Scope) -> Env (Term n) ys -> Env (Term n) (ys ++ xs)
 mkEnvOnto fc [<]     vs = vs
 mkEnvOnto fc (ns:<n) vs =
   mkEnvOnto fc ns vs :< PVar fc top Explicit (Erased fc Placeholder)
@@ -294,7 +294,7 @@ mkEnvOnto fc (ns:<n) vs =
 ||| and types of the contents.
 ||| We use this when building and comparing case trees.
 export
-mkEnv : FC -> (vs : Scope) -> Env Term vs
+mkEnv : FC -> (vs : Scope) -> Env (Term n) vs
 mkEnv fc [<] = [<]
 mkEnv fc (ns:<n) = mkEnv fc ns :< PVar fc top Explicit (Erased fc Placeholder)
 
@@ -305,21 +305,24 @@ mkEnv fc (ns:<n) = mkEnv fc ns :< PVar fc top Explicit (Erased fc Placeholder)
 export
 uniqifyEnv :
      {vars : _}
-  -> Env Term vars
-  -> (vars' ** (Env Term vars', CompatibleVars vars vars'))
+  -> Env (Term n) vars
+  -> (vars' ** (Env (Term n) vars', CompatibleVars vars vars'))
 uniqifyEnv env = uenv [<] env
   where
-    uniqueLocal : SnocList Name -> Name -> Name
-    uniqueLocal vs n =
-      if n `elem` vs
-         then assert_total (uniqueLocal vs (next n))
-         else n
+    unique : Nat -> Nat -> SnocList VarName -> VarName -> VarName
+    unique 0     j sx x = machineName x.name j
+    unique (S k) j sx x =
+     let v2 := machineName x.name j
+      in if v2 `elem` sx then unique k (S j) sx x else v2
+
+    uniqueLocal : SnocList VarName -> VarName -> VarName
+    uniqueLocal vs n = if n `elem` vs then unique 0 (length vs) vs n else n
 
     uenv :
          {vars : _}
-      -> SnocList Name
-      -> Env Term vars
-      -> (vars' ** (Env Term vars', CompatibleVars vars vars'))
+      -> SnocList VarName
+      -> Env (Term n) vars
+      -> (vars' ** (Env (Term n) vars', CompatibleVars vars vars'))
     uenv used [<] = ([<] ** ([<], Pre))
     uenv used {vars = vs:<v} (bs:<b) =
       if v `elem` used
@@ -332,41 +335,45 @@ uniqifyEnv env = uenv [<] env
                in (vs':<v ** (env':<b', Ext compat))
 
 export
-allVars : {0 vars : _} -> Env Term vars -> SnocList (Var vars)
+allVars : {0 vars : _} -> Env (Term n) vars -> SnocList (Var vars)
 allVars env = go env zero
   where
     go :
          {0 vars : _}
-      -> Env Term vars
-      -> {0 seen : List Name}
+      -> Env (Term n) vars
+      -> {0 seen : List VarName}
       -> LSizeOf seen
       -> SnocList (Var (vars <>< seen))
     go [<]     _ = [<]
     go (vs:<v) p = go vs (suc p) :< mkVarFishly p
 
 export
-allVarsNoLet : {0 vars : _} -> Env Term vars -> SnocList (Var vars)
+allVarsNoLet : {0 vars : _} -> Env (Term n) vars -> SnocList (Var vars)
 allVarsNoLet env = go env zero
   where
     go :
          {0 vars : _}
-      -> Env Term vars
-      -> {0 seen : List Name}
+      -> Env (Term n) vars
+      -> {0 seen : List VarName}
       -> LSizeOf seen
       -> SnocList (Var (vars <>< seen))
     go [<] _ = [<]
     go (vs :< Let _ _ _ _) p = go vs (suc p)
     go (vs :< v)           p = go vs (suc p) :< mkVarFishly p
 
-export
-close : FC -> String -> Env Term vs -> Term vs -> ClosedTerm
-close fc nm env tm =
-  let (s, env) := mkSubstEnv 0 env
-   in substs s env (rewrite appendLinLeftNeutral vs in tm)
-
-  where
-    mkSubstEnv : {0 vs : _} -> Bits32 -> Env Term vs -> (SizeOf vs, SubstEnv vs Scope.empty)
-    mkSubstEnv i [<] = (zero, Subst.empty)
-    mkSubstEnv i (vs:<v) =
-      let (s, env) := mkSubstEnv (i + 1) vs
-       in (suc s, env :< Ref fc Bound (MN nm i))
+-- export
+-- close : FC -> String -> Env FTerm vs -> FTerm vs -> ClosedTerm
+-- close fc nm env tm =
+--   let (s, env) := mkSubstEnv 0 env
+--    in substs s env (rewrite appendLinLeftNeutral vs in tm)
+--
+--   where
+--     mkSubstEnv :
+--          {0 vs : _}
+--       -> Nat
+--       -> Env FTerm vs
+--       -> (SizeOf vs, SubstEnv n vs Scope.empty)
+--     mkSubstEnv i [<] = (zero, Subst.empty)
+--     mkSubstEnv i (vs:<v) =
+--       let (s, env) := mkSubstEnv (i + 1) vs
+--        in (suc s, env :< Ref fc Bound (machineName nm i))
