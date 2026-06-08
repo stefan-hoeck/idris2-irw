@@ -43,6 +43,13 @@ data RefName : Type where
 %runElab derive "RefName" [Show,Eq,Ord]
 
 export
+HDecEq RefName where
+  hdecEq (Basic x) (Basic y) = M0.maybeCong Basic (hdecEq x y)
+  hdecEq (Op x)    (Op y)    = M0.maybeCong Op (hdecEq x y)
+  hdecEq (Field x) (Field y) = M0.maybeCong Field (hdecEq x y)
+  hdecEq _         _         = Nothing0
+
+export
 Interpolation RefName where
   interpolate (Basic n) = n
   interpolate (Op n)    = n
@@ -79,6 +86,10 @@ Interpolation FullName where
   interpolate (FN (Just ns) $ Op n) = "\{ns}.(\{n})"
   interpolate (FN (Just ns) $ Basic n) = "\{ns}.\{n}"
   interpolate (FN (Just ns) $ Field n) = "\{ns}.(\{n})"
+
+export
+HDecEq FullName where
+  hdecEq (FN m1 n1) (FN m2 n2) = M0.maybeCong2 FN (hdecEq m1 m2) (hdecEq n1 n2)
 
 export
 toVarName : FullName -> Maybe VarName

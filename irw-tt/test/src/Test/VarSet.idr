@@ -44,7 +44,7 @@ prop_weakenNs =
   property $ do
     AVS (ns:<n) set <- forAll anyVarSet | _ => pure ()
     v               <- forAll $ vars1 ns n
-    sn              <- forAll $ snocList (linear 0 10) names
+    sn              <- forAll $ snocList (linear 0 10) varNames
     let sz := mkSizeOf sn
     elem v set === elem (weakenNs sz v) (weakenNs sz set)
 
@@ -52,8 +52,8 @@ prop_genWeakenNs : Property
 prop_genWeakenNs =
   property $ do
     AVS outer set <- forAll anyVarSet
-    local         <- forAll $ snocList (linear 0 10) names
-    ns            <- forAll $ snocList (linear 0 10) names
+    local         <- forAll $ snocList (linear 0 10) varNames
+    ns            <- forAll $ snocList (linear 0 10) varNames
     let Just g    := vars (outer++local) | Nothing => pure ()
     v             <- forAll g
 

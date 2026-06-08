@@ -11,15 +11,14 @@ FromString Namespace where
   fromString = mkNamespace
 
 export %inline
-FromString UserName where
-  fromString = mkUserName
+FromString RefName where
+  fromString = refName
 
 export
-FromString Name where
+FromString FullName where
   fromString s =
     case mkNamespacedIdent s of
-      (Just ns,y) => NS ns (UN $ fromString y)
-      (_,y)       => UN $ fromString y
+      (m,y) => FN m $ fromString y
 
 ||| Alpha-numeric, underscore ('_'), or single quote ('\'')
 export
@@ -36,6 +35,22 @@ identifiers = fastPack <$> [| alpha :: list (linear 0 10) identChar |]
 export
 lcIdents : Gen String
 lcIdents = fastPack <$> [| lower :: list (linear 0 10) identChar |]
+
+export
+varNames : Gen VarName
+varNames = VN <$> identifiers
+
+export
+opChar : Gen Char
+opChar =
+  element
+    [':','!','#','$','%','&','*','+','.','/'
+    ,'<','=','>','?','@','\\','^','|','-','~'
+    ]
+
+export
+opNames : Gen String
+opNames = fastPack <$> [| opChar :: list (linear 0 4) opChar |]
 
 ||| Like `identifiers` but starts with an upper-case character.
 export
@@ -54,36 +69,14 @@ moduleIdents = MkMI <$> snocList (linear 0 4) moduleNames
 
 ||| A generator of `UserName`s
 export
-userNames : Gen UserName
-userNames =
-  frequency
-    [ (10, Basic <$> identifiers)
-    , (10, Field <$> lcIdents)
-    , (1, pure Underscore)
-    ]
-
-names0 : Gen Name
-names0 =
+refNames : Gen RefName
+refNames =
   choice
-    [ UN <$> userNames
-    , [| MN (string (linear 1 4) lower) anyBits32 |]
-    , [| PV (UN <$> userNames) anyBits32 |]
-    , [| DN (string (linear 1 4) lower) (UN <$> userNames) |]
-    , [| CaseBlock (string (linear 1 4) lower) anyBits32 |]
-    , [| WithBlock (string (linear 1 4) lower) anyBits32 |]
-    , [| Resolved anyBits32 |]
+    [ Basic <$> identifiers
+    , Field <$> lcIdents
+    , Op <$> opNames
     ]
-
-namesN : Nat -> Gen Name
-namesN 0     = names0
-namesN (S k) =
-  choice $
-    [ [| NS namespaces names0 |]
-    , [| Nested [| (anyBits32, anyBits32) |] (namesN k) |]
-    , names0
-    ]
-
-||| A generator of `Name`s
+--
 export %inline
-names : Gen Name
-names = namesN 2
+fullNames : Gen FullName
+fullNames = [| FN (maybe namespaces) refNames |]
