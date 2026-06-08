@@ -24,7 +24,7 @@ rigCounts : Gen ZeroOneOmega
 rigCounts = element [erased,linear,top]
 
 export
-vars1 : (vs : Scope) -> (n : Name) -> Gen (Var $ vs:<n)
+vars1 : (vs : Scope) -> (n : VarName) -> Gen (Var $ vs:<n)
 vars1 vs n =
   case allVars (vs:<n) <>> [] of
     [] => pure first
@@ -33,7 +33,7 @@ vars1 vs n =
 export
 anyVars : Gen AnyVar
 anyVars =
-  snocList (linear 1 10) names >>= \case
+  snocList (linear 1 10) varNames >>= \case
     [<]   => pure $ AV [<"foo"] first
     sn:<n => map (\x => AV (sn:<n) x) (vars1 sn n)
 
@@ -45,7 +45,7 @@ vars vs =
     h::t => Just $ element (h :: fromList t)
 
 export
-varSets : (vs : Scope) -> (n : Name) -> Gen (VarSet $ vs:<n)
+varSets : (vs : Scope) -> (n : VarName) -> Gen (VarSet $ vs:<n)
 varSets vs n =
  let gv := vars1 vs n
   in fromList <$> list (linear 0 20) gv
@@ -53,7 +53,7 @@ varSets vs n =
 export
 anyVarSet : Gen AnyVarSet
 anyVarSet =
-  snocList (linear 1 10) names >>= \case
+  snocList (linear 1 10) varNames >>= \case
     [<]   => pure $ AVS [<] empty
     sn:<n => map (\x => AVS _ x) (varSets sn n)
 
@@ -223,41 +223,43 @@ export
 whyErased : Gen a -> Gen (WhyErased a)
 whyErased g = choice [ Dotted <$> g, element [Placeholder, Impossible]]
 
-terms0 : (vs : Scope) -> Vect 4 (Gen $ Term vs)
-terms0 vs =
-  [ [| Ref fcs nameTypes names |]
-  , [| PrimVal fcs constants |]
-  , [| TType fcs names |]
-  , maybe
-      [| PrimVal fcs constants |]
-      (\g => [| Local fcs (maybe bool) g |])
-      (vars vs)
-  ]
+parameters (g : Gen n)
 
-binds : (vs : Scope) -> Nat -> Name -> Gen (Term vs)
+  terms0 : (vs : Scope) -> Vect 4 (Gen $ Term n vs)
+  terms0 vs =
+    [ [| Ref fcs nameTypes g |]
+    , [| PrimVal fcs constants |]
+    , [| TType fcs varNames |]
+    , maybe
+        [| PrimVal fcs constants |]
+        (\g => [| Local fcs (maybe bool) g |])
+        (vars vs)
+    ]
 
-termsL : (vs : Scope) -> Nat -> Gen (List $ Term vs)
+  binds : (vs : Scope) -> Nat -> VarName -> Gen (Term n vs)
 
-termsN : (vs : Scope) -> Nat -> Gen (Term vs)
-termsN vs 0     = choice (terms0 vs)
-termsN vs (S k) =
-  choice $
-       [| Meta fcs names anyBits32 (termsL vs k) |]
-    :: [| App fcs (termsN vs k) (termsN vs k) |]
-    :: [| As fcs useSides (termsN vs k) (termsN vs k) |]
-    :: [| TDelayed fcs lazyReasons (termsN vs k) |]
-    :: [| TDelay fcs lazyReasons (termsN vs k) (termsN vs k) |]
-    :: [| TForce fcs lazyReasons (termsN vs k) |]
-    :: (names >>= binds vs k)
-    :: terms0 vs
+  termsL : (vs : Scope) -> Nat -> Gen (List $ Term n vs)
 
-termsL vs n = list (linear 0 3) (termsN vs n)
+  termsN : (vs : Scope) -> Nat -> Gen (Term n vs)
+  termsN vs 0     = choice (terms0 vs)
+  termsN vs (S k) =
+    choice $
+         [| Meta fcs varNames (termsL vs k) |]
+      :: [| App fcs (termsN vs k) (termsN vs k) |]
+      :: [| As fcs useSides (termsN vs k) (termsN vs k) |]
+      :: [| TDelayed fcs lazyReasons (termsN vs k) |]
+      :: [| TDelay fcs lazyReasons (termsN vs k) (termsN vs k) |]
+      :: [| TForce fcs lazyReasons (termsN vs k) |]
+      :: (varNames >>= binds vs k)
+      :: terms0 vs
 
-binds vs n v = [| mkBind fcs (binders $ termsN vs n) (termsN (vs:<v) n) |]
-  where
-    mkBind : FC -> Binder (Term vs) -> Term (vs:<v) -> Term vs
-    mkBind fc = Bind fc v
+  termsL vs n = list (linear 0 3) (termsN vs n)
 
-export
-terms : (vs : Scope) -> Gen (Term vs)
-terms vs = termsN vs 4
+  binds vs x v = [| mkBind fcs (binders $ termsN vs x) (termsN (vs:<v) x) |]
+    where
+      mkBind : FC -> Binder (Term n vs) -> Term n (vs:<v) -> Term n vs
+      mkBind fc = Bind fc v
+
+  export
+  terms : (vs : Scope) -> Gen (Term n vs)
+  terms vs = termsN vs 4

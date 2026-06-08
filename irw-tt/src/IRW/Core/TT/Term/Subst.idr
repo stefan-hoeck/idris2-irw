@@ -12,18 +12,18 @@ import IRW.Libs.Data.SizeOf
 %default total
 
 public export
-SubstEnv : Scope -> Scoped
-SubstEnv = Subst Term
+0 SubstEnv : Type -> Scope -> Scoped
+SubstEnv n = Subst (Term n)
 
-substTerm : Substitutable Term Term
-substTerms : Substitutable Term (List . Term)
-substBinder : Substitutable Term (Binder . Term)
+substTerm : Substitutable (Term n) (Term n)
+substTerms : Substitutable (Term n) (List . Term n)
+substBinder : Substitutable (Term n) (Binder . Term n)
 
 substTerm outer dropped env (Local fc r v)
     = find (Local fc r) outer dropped v env
 substTerm outer dropped env (Ref fc x name) = Ref fc x name
-substTerm outer dropped env (Meta fc n i xs)
-    = Meta fc n i (substTerms outer dropped env xs)
+substTerm outer dropped env (Meta fc n xs)
+    = Meta fc n (substTerms outer dropped env xs)
 substTerm outer dropped env (Bind fc x b scope)
     = Bind fc x (substBinder outer dropped env b)
                 (substTerm (suc outer) dropped env scope)
@@ -48,9 +48,9 @@ substBinder outer dropped env b
   = assert_total $ map (substTerm outer dropped env) b
 
 export
-substs : SizeOf dropped -> SubstEnv dropped vars -> Term (vars++dropped) -> Term vars
+substs : SizeOf dropped -> SubstEnv n dropped vs -> Term n (vs++dropped) -> Term n vs
 substs dropped env tm = substTerm zero dropped env tm
 
 export
-subst : Term vars -> Term (Scope.bind vars x) -> Term vars
+subst : Term n vs -> Term n (Scope.bind vs x) -> Term n vs
 subst val tm = substs (suc zero) [<val] tm

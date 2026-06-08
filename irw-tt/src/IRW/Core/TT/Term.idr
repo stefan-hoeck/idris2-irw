@@ -21,7 +21,6 @@ import IRW.Libs.Data.SizeOf
 %hide Language.Reflection.TT.FC
 %hide Language.Reflection.TT.IsVar
 %hide Language.Reflection.TT.LazyReason
-%hide Language.Reflection.TT.Name
 %hide Language.Reflection.TT.Namespace
 %hide Language.Reflection.TT.NameType
 %hide Language.Reflection.TT.PiInfo
@@ -106,15 +105,15 @@ Traversable WhyErased where
 --------------------------------------------------------------------------------
 
 public export
-data Term : Scope -> Type where
-     Local : FC -> (isLet : Maybe Bool) -> Var vs -> Term vs
-     Ref : FC -> NameType -> (name : Name) -> Term vs
+data Term : (n : Type) -> Scope -> Type where
+     Local : FC -> (isLet : Maybe Bool) -> Var vs -> Term n vs
+     Ref : FC -> NameType -> (name : n) -> Term n vs
      -- Metavariables and the scope they are applied to
-     Meta : FC -> Name -> Bits32 -> List (Term vs) -> Term vs
-     Bind : FC -> (x : Name) ->
-            (b : Binder (Term vs)) ->
-            (scope : Term (Scope.bind vs x)) -> Term vs
-     App : FC -> (fn : Term vs) -> (arg : Term vs) -> Term vs
+     Meta : FC -> VarName -> List (Term n vs) -> Term n vs
+     Bind : FC -> (x : VarName) ->
+            (b : Binder (Term n vs)) ->
+            (scope : Term n (Scope.bind vs x)) -> Term n vs
+     App : FC -> (fn : Term n vs) -> (arg : Term n vs) -> Term n vs
      -- as patterns; since we check LHS patterns as terms before turning
      -- them into patterns, this helps us get it right. When normalising,
      -- we just reduce the inner term and ignore the 'as' part
@@ -122,39 +121,43 @@ data Term : Scope -> Type where
      -- easier this way since it gives us the ability to work with unresolved
      -- names (Ref) and resolved names (Local) without having to define a
      -- special purpose thing. (But it'd be nice to tidy that up, nevertheless)
-     As : FC -> UseSide -> (as : Term vs) -> (pat : Term vs) -> Term vs
+     As : FC -> UseSide -> (as : Term n vs) -> (pat : Term n vs) -> Term n vs
      -- Typed laziness annotations
-     TDelayed : FC -> LazyReason -> Term vs -> Term vs
-     TDelay : FC -> LazyReason -> (ty : Term vs) -> (arg : Term vs) -> Term vs
-     TForce : FC -> LazyReason -> Term vs -> Term vs
-     PrimVal : FC -> (c : Constant) -> Term vs
-     Erased : FC -> WhyErased (Term vs) -> Term vs
-     TType : FC -> Name -> -- universe variable
-             Term vs
+     TDelayed : FC -> LazyReason -> Term n vs -> Term n vs
+     TDelay : FC -> LazyReason -> (ty : Term n vs) -> (arg : Term n vs) -> Term n vs
+     TForce : FC -> LazyReason -> Term n vs -> Term n vs
+     PrimVal : FC -> (c : Constant) -> Term n vs
+     Erased : FC -> WhyErased (Term n vs) -> Term n vs
+     TType : FC -> VarName -> -- universe variable
+             Term n vs
 
-%runElab deriveIndexed "Term" [Show]
+%runElab derivePattern "Term" [P,I] [Show]
 %name Term t, u
 
 public export
-ClosedTerm : Type
-ClosedTerm = Term [<]
+0 FTerm : Scoped
+FTerm = Term FullName
+
+public export
+0 ClosedTerm : Type
+ClosedTerm = Term FullName [<]
 
 --------------------------------------------------------------------------------
 -- Weakening
 --------------------------------------------------------------------------------
 
-insL : GenWeakenable (List . Term)
+insL : GenWeakenable (List . Term n)
 
-insB : GenWeakenable (Binder . Term)
+insB : GenWeakenable (Binder . Term n)
 
-insW : GenWeakenable (WhyErased . Term)
+insW : GenWeakenable (WhyErased . Term n)
 
-insP : GenWeakenable (PiInfo . Term)
+insP : GenWeakenable (PiInfo . Term n)
 
-insT : GenWeakenable Term
+insT : GenWeakenable (Term n)
 insT o ns (Local fc r v)      = Local fc r $ genWeakenNs o ns v
 insT o ns (Ref fc nt name)    = Ref fc nt name
-insT o ns (Meta fc n m ts)    = Meta fc n m (insL o ns ts)
+insT o ns (Meta fc n ts)      = Meta fc n (insL o ns ts)
 insT o ns (Bind fc x b sc)    = Bind fc x (insB o ns b) (insT (suc o) ns sc)
 insT o ns (App fc fn x)       = App fc (insT o ns fn) (insT o ns x)
 insT o ns (As fc s as pat)    = As fc s (insT o ns as) (insT o ns pat)
@@ -185,62 +188,40 @@ insB o n (PLet fc r v t) = PLet fc r (insT o n v) (insT o n t)
 insB o n (PVTy fc r t) = PVTy fc r (insT o n t)
 
 export %inline
-GenWeaken Term where genWeakenNs = insT
+GenWeaken (Term n) where genWeakenNs = insT
 
 export %inline
-GenWeaken (PiInfo . Term) where genWeakenNs = insP
+GenWeaken (PiInfo . Term n) where genWeakenNs = insP
 
 export %inline
-GenWeaken (WhyErased . Term) where genWeakenNs = insW
+GenWeaken (WhyErased . Term n) where genWeakenNs = insW
 
 export %inline
-GenWeaken (Binder . Term) where genWeakenNs = insB
+GenWeaken (Binder . Term n) where genWeakenNs = insB
 
 export %inline
-GenWeaken (List . Term) where genWeakenNs = insL
+GenWeaken (List . Term n) where genWeakenNs = insL
 
 export
-compatTerm : CompatibleVars xs ys -> Term xs -> Term ys
+compatTerm : CompatibleVars xs ys -> Term n xs -> Term n ys
 compatTerm compat tm = believe_me tm -- no names in term, so it's identity
--- This is how we would define it:
--- compatTerm CompatPre tm = tm
--- compatTerm prf (Local fc r idx vprf)
---     = let MkVar vprf' = compatIsVar prf vprf in
---           Local fc r _ vprf'
--- compatTerm prf (Ref fc x name) = Ref fc x name
--- compatTerm prf (Meta fc n i args)
---     = Meta fc n i (map (compatTerm prf) args)
--- compatTerm prf (Bind fc x b scope)
---     = Bind fc x (map (compatTerm prf) b) (compatTerm (CompatExt prf) scope)
--- compatTerm prf (App fc fn arg)
---     = App fc (compatTerm prf fn) (compatTerm prf arg)
--- compatTerm prf (As fc s as tm)
---     = As fc s (compatTerm prf as) (compatTerm prf tm)
--- compatTerm prf (TDelayed fc r ty) = TDelayed fc r (compatTerm prf ty)
--- compatTerm prf (TDelay fc r ty tm)
---     = TDelay fc r (compatTerm prf ty) (compatTerm prf tm)
--- compatTerm prf (TForce fc r x) = TForce fc r (compatTerm prf x)
--- compatTerm prf (PrimVal fc c) = PrimVal fc c
--- compatTerm prf (Erased fc i) = Erased fc i
--- compatTerm prf (TType fc) = TType fc
---
 
 --------------------------------------------------------------------------------
 -- Shrinking
 --------------------------------------------------------------------------------
 
-shrL : Shrinkable (List . Term)
+shrL : Shrinkable (List . Term n)
 
-shrB : Shrinkable (Binder . Term)
+shrB : Shrinkable (Binder . Term n)
 
-shrW : Shrinkable (WhyErased . Term)
+shrW : Shrinkable (WhyErased . Term n)
 
-shrP : Shrinkable (PiInfo . Term)
+shrP : Shrinkable (PiInfo . Term n)
 
-shrT : Shrinkable Term
+shrT : Shrinkable (Term n)
 shrT (Local fc r v) th      = Local fc r <$> shrink v th
 shrT (Ref fc nt name) th    = Just $ Ref fc nt name
-shrT (Meta fc n m ts) th    = Meta fc n m <$> shrL ts th
+shrT (Meta fc n ts) th      = Meta fc n <$> shrL ts th
 shrT (Bind fc x b sc) th    = Bind fc x  <$> shrB b th <*> shrT sc (Keep th)
 shrT (App fc fn x) th       = App fc <$> shrT fn th <*> shrT x th
 shrT (As fc s as pat) th    = As fc s <$> shrT as th <*> shrT pat th
@@ -274,18 +255,18 @@ shrB (PVTy fc r t)   th = PVTy fc r <$> shrT t th
 -- Thinning
 --------------------------------------------------------------------------------
 
-thiL : Thinnable (List . Term)
+thiL : Thinnable (List . Term n)
 
-thiB : Thinnable (Binder . Term)
+thiB : Thinnable (Binder . Term n)
 
-thiW : Thinnable (WhyErased . Term)
+thiW : Thinnable (WhyErased . Term n)
 
-thiP : Thinnable (PiInfo . Term)
+thiP : Thinnable (PiInfo . Term n)
 
-thiT : Thinnable Term
+thiT : Thinnable (Term n)
 thiT (Local fc r v) th      = Local fc r $ thin v th
 thiT (Ref fc nt name) th    = Ref fc nt name
-thiT (Meta fc n m ts) th    = Meta fc n m $ thiL ts th
+thiT (Meta fc n ts) th      = Meta fc n $ thiL ts th
 thiT (Bind fc x b sc) th    = Bind fc x  (thiB b th) (thiT sc (Keep th))
 thiT (App fc fn x) th       = App fc (thiT fn th) (thiT x th)
 thiT (As fc s as pat) th    = As fc s (thiT as th) (thiT pat th)
@@ -316,34 +297,34 @@ thiB (PLet fc r v t) th = PLet fc r (thiT v th) (thiT t th)
 thiB (PVTy fc r t)   th = PVTy fc r (thiT t th)
 
 export
-FreelyEmbeddable Term where
+FreelyEmbeddable (Term n) where
 
 export %inline
-IsScoped Term where
+IsScoped (Term n) where
   shrink = shrT
   thin = thiT
   compatNs x = believe_me x
 
 export %inline
-IsScoped (List . Term) where
+IsScoped (List . Term n) where
   shrink = shrL
   thin = thiL
   compatNs x = believe_me x
 
 export %inline
-IsScoped (Binder . Term) where
+IsScoped (Binder . Term n) where
   shrink = shrB
   thin = thiB
   compatNs x = believe_me x
 
 export %inline
-IsScoped (PiInfo . Term) where
+IsScoped (PiInfo . Term n) where
   shrink = shrP
   thin = thiP
   compatNs x = believe_me x
 
 export %inline
-IsScoped (WhyErased . Term) where
+IsScoped (WhyErased . Term n) where
   shrink = shrW
   thin = thiW
   compatNs x = believe_me x
@@ -353,49 +334,52 @@ IsScoped (WhyErased . Term) where
 --------------------------------------------------------------------------------
 
 export
-apply : FC -> Term vs -> List (Term vs) -> Term vs
+apply : FC -> Term n vs -> List (Term n vs) -> Term n vs
 apply loc fn [] = fn
 apply loc fn (a :: args) = apply loc (App loc fn a) args
 
 ||| Creates a chain of `App` nodes, each with its own file context
 export
-applySpineWithFC : Term vs -> SnocList (FC, Term vs) -> Term vs
+applySpineWithFC : Term n vs -> SnocList (FC, Term n vs) -> Term n vs
 applySpineWithFC fn [<] = fn
 applySpineWithFC fn (args :< (fc, arg)) = App fc (applySpineWithFC fn args) arg
 
 ||| Creates a chain of `App` nodes, each with its own file context
 export
-applyStackWithFC : Term vs -> List (FC, Term vs) -> Term vs
+applyStackWithFC : Term n vs -> List (FC, Term n vs) -> Term n vs
 applyStackWithFC fn [] = fn
 applyStackWithFC fn ((fc, arg) :: args) = applyStackWithFC (App fc fn arg) args
 
+fnName : VarName
+fnName = "_0"
+
 ||| Build a simple function type
 export
-fnType : FC -> Term vs -> Term vs -> Term vs
+fnType : FC -> Term n vs -> Term n vs -> Term n vs
 fnType fc arg scope =
-  Bind EmptyFC (MN "_" 0) (Pi fc top Explicit arg) (weaken scope)
+  Bind EmptyFC fnName (Pi fc top Explicit arg) (weaken scope)
 
 ||| Build a simple linear function type
 export
-linFnType : FC -> Term vs -> Term vs -> Term vs
+linFnType : FC -> Term n vs -> Term n vs -> Term n vs
 linFnType fc arg scope =
-  Bind EmptyFC (MN "_" 0) (Pi fc linear Explicit arg) (weaken scope)
+  Bind EmptyFC fnName (Pi fc linear Explicit arg) (weaken scope)
 
 export
-getFnArgs : Term vs -> (Term vs, List (Term vs))
+getFnArgs : Term n vs -> (Term n vs, List (Term n vs))
 getFnArgs tm = getFA [] tm
   where
-    getFA : List (Term vs) -> Term vs -> (Term vs, List (Term vs))
+    getFA : List (Term n vs) -> Term n vs -> (Term n vs, List (Term n vs))
     getFA args (App _ f a) = getFA (a :: args) f
     getFA args tm = (tm, args)
 
 export
-getFn : Term vs -> Term vs
+getFn : Term n vs -> Term n vs
 getFn (App _ f a) = getFn f
 getFn tm = tm
 
 export %inline
-getArgs : Term vs -> List (Term vs)
+getArgs : Term n vs -> List (Term n vs)
 getArgs = snd . getFnArgs
 
 --------------------------------------------------------------------------------
@@ -411,29 +395,27 @@ interface StripNamespace a where
   restoreNS : Namespace -> a -> a
 
 export
-StripNamespace Name where
-  trimNS ns nm@(NS tns n) = if ns == tns then NS emptyNS n else nm
-    -- ^ A blank namespace, rather than a UN, so we don't catch primitive
-    -- names which are represented as UN.
-  trimNS ns nm = nm
+StripNamespace FullName where
+  trimNS ns nm@(FN (Just tns) n) = if ns == tns then FN (Just emptyNS) n else nm
+  trimNS ns nm                   = nm
 
-  restoreNS ns nm@(NS tns n) =
+  restoreNS ns nm@(FN (Just tns) n) =
     case tns.names of
-      [<] => NS ns n
+      [<] => FN (Just ns) n
       _   => nm
   restoreNS ns nm = nm
 
-adjL : (Name -> Name) -> List (Term vs) -> List (Term vs)
+adjL : (FullName -> FullName) -> List (FTerm vs) -> List (FTerm vs)
 
-adjB : (Name -> Name) -> Binder (Term vs) -> Binder (Term vs)
+adjB : (FullName -> FullName) -> Binder (FTerm vs) -> Binder (FTerm vs)
 
-adjW : (Name -> Name) -> WhyErased (Term vs) -> WhyErased (Term vs)
+adjW : (FullName -> FullName) -> WhyErased (FTerm vs) -> WhyErased (FTerm vs)
 
-adjP : (Name -> Name) -> PiInfo (Term vs) -> PiInfo (Term vs)
+adjP : (FullName -> FullName) -> PiInfo (FTerm vs) -> PiInfo (FTerm vs)
 
-adjT : (Name -> Name) -> Term vs -> Term vs
+adjT : (FullName -> FullName) -> FTerm vs -> FTerm vs
 adjT f (Ref fc nt name)    = Ref fc nt (f name)
-adjT f (Meta fc n m ts)    = Meta fc n m $ adjL f ts
+adjT f (Meta fc n ts)      = Meta fc n $ adjL f ts
 adjT f (Bind fc x b sc)    = Bind fc x  (adjB f b) (adjT f sc)
 adjT f (App fc fn x)       = App fc (adjT f fn) (adjT f x)
 adjT f (As fc s as pat)    = As fc s (adjT f as) (adjT f pat)
@@ -459,20 +441,20 @@ adjB f (PLet fc r v t) = PLet fc r (adjT f v) (adjT f t)
 adjB f (PVTy fc r t)   = PVTy fc r (adjT f t)
 
 export %inline
-StripNamespace (Term vs) where
+StripNamespace (FTerm vs) where
   trimNS = adjT . trimNS
   restoreNS = adjT . restoreNS
 
 export
-isErased : Term vs -> Bool
+isErased : FTerm vs -> Bool
 isErased (Erased {}) = True
 isErased _ = False
 
 export
-getLoc : Term vs -> FC
+getLoc : Term n vs -> FC
 getLoc (Local fc _ _) = fc
 getLoc (Ref fc _ _) = fc
-getLoc (Meta fc _ _ _) = fc
+getLoc (Meta fc _ _) = fc
 getLoc (Bind fc _ _ _) = fc
 getLoc (App fc _ _) = fc
 getLoc (As fc _ _ _) = fc
@@ -497,11 +479,11 @@ eqWhyErasedBy eq (Dotted t) (Dotted u) = eq t u
 eqWhyErasedBy eq _ _ = False
 
 export total
-eqTerm : Term vs -> Term vs' -> Bool
+eqTerm : Eq n => Term n vs -> Term n vs' -> Bool
 eqTerm (Local _ _ v) (Local _ _ v') = varIdx v == varIdx v'
 eqTerm (Ref _ _ n) (Ref _ _ n') = n == n'
-eqTerm (Meta _ _ i args) (Meta _ _ i' args')
-    = i == i' && assert_total (all (uncurry eqTerm) (zip args args'))
+eqTerm (Meta _ n args) (Meta _ n' args')
+    = n == n' && assert_total (all (uncurry eqTerm) (zip args args'))
 eqTerm (Bind _ _ b sc) (Bind _ _ b' sc')
     = assert_total (eqBinderBy eqTerm b b') && eqTerm sc sc'
 eqTerm (App _ f a) (App _ f' a') = eqTerm f f' && eqTerm a a'
@@ -515,26 +497,26 @@ eqTerm (TType {}) (TType {}) = True
 eqTerm _ _ = False
 
 export %inline
-Eq (Term vs) where (==) = eqTerm
+Eq n => Eq (Term n vs) where (==) = eqTerm
 
 --------------------------------------------------------------------------------
 -- Scope checking
 --------------------------------------------------------------------------------
 
-rsvL : (vs : Scope) -> List (Term vs) -> List (Term vs)
+rsvL : (vs : Scope) -> List (FTerm vs) -> List (FTerm vs)
 
-rsvB : (vs : Scope) -> Binder (Term vs) -> Binder (Term vs)
+rsvB : (vs : Scope) -> Binder (FTerm vs) -> Binder (FTerm vs)
 
-rsvW : (vs : Scope) -> WhyErased (Term vs) -> WhyErased (Term vs)
+rsvW : (vs : Scope) -> WhyErased (FTerm vs) -> WhyErased (FTerm vs)
 
-rsvP : (vs : Scope) -> PiInfo (Term vs) -> PiInfo (Term vs)
+rsvP : (vs : Scope) -> PiInfo (FTerm vs) -> PiInfo (FTerm vs)
 
-rsvT : (vs : Scope) -> Term vs -> Term vs
-rsvT vs (Ref fc Bound name)    =
-  case isNVar name vs of
-    Nothing => Ref fc Bound name
-    Just x  => Local fc (Just False) (forgetName x)
-rsvT vs (Meta fc n m ts)    = Meta fc n m $ rsvL vs ts
+rsvT : (vs : Scope) -> FTerm vs -> FTerm vs
+rsvT vs (Ref fc Bound n)    =
+ let Just v  := toVarName n | _ => Ref fc Bound n
+     Just nv := isNVar vs v | _ => Ref fc Bound n
+  in Local fc (Just False) (forgetName nv)
+rsvT vs (Meta fc n ts)      = Meta fc n $ rsvL vs ts
 rsvT vs (Bind fc x b sc)    = Bind fc x  (rsvB vs b) (rsvT (vs:<x) sc)
 rsvT vs (App fc fn x)       = App fc (rsvT vs fn) (rsvT vs x)
 rsvT vs (As fc s as pat)    = As fc s (rsvT vs as) (rsvT vs pat)
@@ -561,5 +543,5 @@ rsvB vs (PVTy fc r t)   = PVTy fc r (rsvT vs t)
 
 ||| Replace any Ref Bound in a type with appropriate local
 export %inline
-resolveNames : (vs : Scope) -> Term vs -> Term vs
+resolveNames : (vs : Scope) -> FTerm vs -> FTerm vs
 resolveNames = rsvT

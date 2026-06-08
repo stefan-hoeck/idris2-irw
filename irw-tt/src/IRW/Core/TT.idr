@@ -20,7 +20,6 @@ import public IRW.Core.TT.Var
 %default total
 %language ElabReflection
 %hide Language.Reflection.TT.FC
-%hide Language.Reflection.TT.Name
 %hide Language.Reflection.TT.NameType
 %hide Language.Reflection.TT.PiInfo
 %hide Language.Reflection.TT.TotalReq
@@ -31,23 +30,22 @@ public export
 record KindedName where
   constructor MkKindedName
   nameKind : Maybe NameType
-  fullName : Name -- fully qualified name
-  rawName  : Name
+  fullName : FullName -- fully qualified name
 
 %runElab derive "KindedName" [Show,Eq]
 
 export %inline
-Interpolation KindedName where interpolate = interpolate . rawName
+Interpolation KindedName where interpolate = interpolate . ref . fullName
 
 %name KindedName kn
 
 export
-defaultKindedName : Name -> KindedName
-defaultKindedName nm = MkKindedName Nothing nm nm
+defaultKindedName : FullName -> KindedName
+defaultKindedName nm = MkKindedName Nothing nm
 
 export
-funKindedName : Name -> KindedName
-funKindedName nm = MkKindedName (Just Func) nm nm
+funKindedName : FullName -> KindedName
+funKindedName nm = MkKindedName (Just Func) nm
 
 public export
 data Visibility = Private | Export | Public
@@ -291,7 +289,7 @@ namespace Bounds
   public export
   data Bounds : Scoped where
     None : Bounds Scope.empty
-    Add  : (x : Name) -> Name -> Bounds sx -> Bounds (sx:<x)
+    Add  : (x : VarName) -> VarName -> Bounds sx -> Bounds (sx:<x)
 
   export
   sizeOf : Bounds sx -> SizeOf sx
@@ -313,7 +311,7 @@ resolveRef :
   -> LSizeOf done
   -> Bounds bound
   -> FC
-  -> Name
+  -> VarName
   -> Maybe (Var (((vs ++ bound) <>< done) ++ outer))
 resolveRef _ _ None _ _ = Nothing
 resolveRef {outer} {vs} {done} p q (Add {sx} new old bs) fc n =
@@ -321,25 +319,22 @@ resolveRef {outer} {vs} {done} p q (Add {sx} new old bs) fc n =
     then Just (weakenNs p $ mkVarFishly q)
     else resolveRef p (suc q) bs fc n
 
-locB : SizeOf o -> Bounds b -> Binder (Term $ vs++o) -> Binder (Term $ (vs++b)++o)
+locB : SizeOf o -> Bounds b -> Binder (FTerm $ vs++o) -> Binder (FTerm $ (vs++b)++o)
 
-locP : SizeOf o -> Bounds b -> PiInfo (Term $ vs++o) -> PiInfo (Term $ (vs++b)++o)
+locP : SizeOf o -> Bounds b -> PiInfo (FTerm $ vs++o) -> PiInfo (FTerm $ (vs++b)++o)
 
-locW : SizeOf o -> Bounds b -> WhyErased (Term $ vs++o) -> WhyErased (Term $ (vs++b)++o)
+locW : SizeOf o -> Bounds b -> WhyErased (FTerm $ vs++o) -> WhyErased (FTerm $ (vs++b)++o)
 
-locL : SizeOf o -> Bounds b -> List (Term $ vs++o) -> List (Term $ (vs++b)++o)
+locL : SizeOf o -> Bounds b -> List (FTerm $ vs++o) -> List (FTerm $ (vs++b)++o)
 
-locT : SizeOf o -> Bounds b -> Term (vs++o) -> Term ((vs++b)++o)
+locT : SizeOf o -> Bounds b -> FTerm (vs++o) -> FTerm ((vs++b)++o)
 locT o bs (Local fc r v) = Local fc r (addVars o bs v)
 locT o bs (Ref fc Bound n) =
-  case resolveRef o zero bs fc n of
-    Nothing => Ref fc Bound n
-    Just v  => Local fc Nothing v
+ let Just vn := toVarName n | _ => Ref fc Bound n
+     Just v  := resolveRef o zero bs fc vn | _ => Ref fc Bound n
+  in Local fc Nothing v
 locT o bs (Ref fc nt n) = Ref fc nt n
-locT o bs (Meta fc n y xs) =
-  case resolveRef o zero bs fc n of
-    Nothing => Meta fc n y (locL o bs xs)
-    Just v  => Local fc Nothing v
+locT o bs (Meta fc n xs) = Meta fc n (locL o bs xs)
 locT o bs (Bind fc x b sc) = Bind fc x (locB o bs b) (locT (suc o) bs sc)
 locT o bs (App fc fn arg) = App fc (locT o bs fn) (locT o bs arg)
 locT o bs (As fc s as tm) = As fc s (locT o bs as) (locT o bs tm)
@@ -370,29 +365,24 @@ locB o bs (PLet fc r v t) = PLet fc r (locT o bs v) (locT o bs t)
 locB o bs (PVTy fc r t)   = PVTy fc r (locT o bs t)
 
 export
-refsToLocals : Bounds b -> Term vs -> Term (vs++b)
+refsToLocals : Bounds b -> FTerm vs -> FTerm (vs++b)
 refsToLocals None y = y
 refsToLocals bs   y = locT zero  bs y
 
 ||| Replace any reference to 'x' with a locally bound name 'new'
 export
-refToLocal : (x : Name) -> (new : Name) -> Term vs -> Term (vs:<new)
+refToLocal : (x : VarName) -> (new : VarName) -> FTerm vs -> FTerm (vs:<new)
 refToLocal x new tm = refsToLocals (Add new x None) tm
 
-subB : Name -> Term vs -> Binder (Term vs) -> Binder (Term vs)
+subB : Eq n => n -> Term n vs -> Binder (Term n vs) -> Binder (Term n vs)
 
-subP : Name -> Term vs -> PiInfo (Term vs) -> PiInfo (Term vs)
+subP : Eq n => n -> Term n vs -> PiInfo (Term n vs) -> PiInfo (Term n vs)
 
-subL : Name -> Term vs -> List (Term vs) -> List (Term vs)
+subL : Eq n => n -> Term n vs -> List (Term n vs) -> List (Term n vs)
 
-subT : Name -> Term vs -> Term vs -> Term vs
-subT n x (Ref fc nt m) =
-  case hdecEq n m of
-    Nothing0 => Ref fc nt m
-    Just0 _  => x
-subT n x (Meta fc m i xs) = Meta fc m i (subL n x xs)
--- ASSUMPTION: When we substitute under binders, the name has always been
--- resolved to a Local, so no need to check that x isn't shadowing
+subT : Eq n => n -> Term n vs -> Term n vs -> Term n vs
+subT n x (Ref fc nt m) = if n == m then x else Ref fc nt m
+subT n x (Meta fc m xs) = Meta fc m (subL n x xs)
 subT n x (Bind fc y b sc) = Bind fc y (subB n x b) (subT n (weaken x) sc)
 subT n x (App fc fn arg) = App fc (subT n x fn) (subT n x arg)
 subT n x (As fc s as pat) = As fc s as (subT n x pat)
@@ -418,86 +408,5 @@ subB n x (PVTy fc r t)   = PVTy fc r (subT n x t)
 
 ||| Replace an explicit name with a term
 export %inline
-substName : Name -> Term vs -> Term vs -> Term vs
+substName : Eq n => n -> Term n vs -> Term n vs -> Term n vs
 substName = subT
-
-metL : Bool -> NameMap Bool -> List (Term vs) -> NameMap Bool
-
-metB : Bool -> NameMap Bool -> Binder (Term vs) -> NameMap Bool
-
-metT : Bool -> NameMap Bool -> Term vs -> NameMap Bool
-metT b ns (Meta fc n i xs) =
-  metL b (insert (ifThenElse b (Resolved i) n) False ns) xs
-metT b ns (Bind fc x bi sc) = metT b (metB b ns bi) sc
-metT b ns (App fc fn arg) = metT b (metT b ns fn) arg
-metT b ns (As fc s as tm) = metT b ns tm
-metT b ns (TDelayed fc x y) = metT b ns y
-metT b ns (TDelay fc x t y) = metT b (metT b ns t) y
-metT b ns (TForce fc r x) = metT b ns x
-metT b ns (Erased fc (Dotted x)) = metT b ns x
-metT b ns _ = ns
-
-metL b ns []      = ns
-metL b ns (t::ts) = metL b (metT b ns t) ts
-
-metB b ns (Lam fc r p t)  = metT b ns t
-metB b ns (Let fc r v t)  = metT b (metT b ns v) t
-metB b ns (Pi fc r p t)   = metT b ns t
-metB b ns (PVar fc r p t) = metT b ns t
-metB b ns (PLet fc r v t) = metT b ns t
-metB b ns (PVTy fc r t)   = metT b ns t
-
-export %inline
-addMetas : (usingResolved : Bool) -> NameMap Bool -> Term vs -> NameMap Bool
-addMetas = metT
-
-||| Get the metavariable names in a term
-export
-getMetas : Term vs -> NameMap Bool
-getMetas tm = addMetas False empty tm
-
-refL : Bool -> Name -> NameMap Bool -> List (Term vs) -> NameMap Bool
-
-refB : Bool -> Name -> NameMap Bool -> Binder (Term vs) -> NameMap Bool
-
-refT : Bool -> Name -> NameMap Bool -> Term vs -> NameMap Bool
-refT b at ns (Ref fc x n) = insert n b ns
-refT b at ns (Meta fc n i xs) = refL b at ns xs
-refT b at ns (Bind fc x bi sc) = refT b at (refB b at ns bi) sc
-refT b at ns (App _ (App _ (Ref fc _ n) x) y) =
-  case n == at of
-    True  => refT True at (insert n True ns) y
-    False => refT b at (refT b at (insert n b ns) x) y
-refT b at ns (App fc fn arg) = refT b at (refT b at ns fn) arg
-refT b at ns (As fc s as tm) = refT b at ns tm
-refT b at ns (TDelayed fc x y) = refT b at ns y
-refT b at ns (TDelay fc x t y) = refT b at (refT b at ns t) y
-refT b at ns (TForce fc r x) = refT b at ns x
-refT b at ns (Erased fc (Dotted x)) = refT b at ns x
-refT b at ns _ = ns
-
-refL b at ns []      = ns
-refL b at ns (t::ts) = refL b at (refT b at ns t) ts
-
-refB b at ns (Lam fc r p t)  = refT b at ns t
-refB b at ns (Let fc r v t)  = refT b at (refT b at ns v) t
-refB b at ns (Pi fc r p t)   = refT b at ns t
-refB b at ns (PVar fc r p t) = refT b at ns t
-refB b at ns (PLet fc r v t) = refT b at ns t
-refB b at ns (PVTy fc r t)   = refT b at ns t
-
-export %inline
-addRefs :
-     (underAssert : Bool)
-  -> (aTotal : Name)
-  -> NameMap Bool
-  -> Term vs
-  -> NameMap Bool
-addRefs = refT
-
-||| As above, but for references. Also flag whether a name is under an
-||| 'assert_total' because we may need to know that in coverage/totality
-||| checking
-export %inline
-getRefs : (aTotal : Name) -> Term vs -> NameMap Bool
-getRefs at = addRefs False at empty

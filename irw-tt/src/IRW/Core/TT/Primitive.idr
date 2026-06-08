@@ -10,7 +10,6 @@ import IRW.Libs.Data.Ordering.Extra
 
 %default total
 %hide Language.Reflection.TT.Constant
-%hide Language.Reflection.TT.Name
 %hide Language.Reflection.TT.PrimType
 %language ElabReflection
 
@@ -93,23 +92,24 @@ primType (PrT {}) = Nothing
 primType WorldVal = Just WorldType
 
 export
-isConstantType : Name -> Maybe PrimType
-isConstantType (UN (Basic n)) = case n of
-  "Int"     => Just IntType
-  "Int8"    => Just Int8Type
-  "Int16"   => Just Int16Type
-  "Int32"   => Just Int32Type
-  "Int64"   => Just Int64Type
-  "Integer" => Just IntegerType
-  "Bits8"   => Just Bits8Type
-  "Bits16"  => Just Bits16Type
-  "Bits32"  => Just Bits32Type
-  "Bits64"  => Just Bits64Type
-  "String"  => Just StringType
-  "Char"    => Just CharType
-  "Double"  => Just DoubleType
-  "%World"  => Just WorldType
-  _ => Nothing
+isConstantType : RefName -> Maybe PrimType
+isConstantType (Basic n) =
+  case n of
+    "Int"     => Just IntType
+    "Int8"    => Just Int8Type
+    "Int16"   => Just Int16Type
+    "Int32"   => Just Int32Type
+    "Int64"   => Just Int64Type
+    "Integer" => Just IntegerType
+    "Bits8"   => Just Bits8Type
+    "Bits16"  => Just Bits16Type
+    "Bits32"  => Just Bits32Type
+    "Bits64"  => Just Bits64Type
+    "String"  => Just StringType
+    "Char"    => Just CharType
+    "Double"  => Just DoubleType
+    "%World"  => Just WorldType
+    _         => Nothing
 isConstantType _ = Nothing
 
 export

@@ -24,7 +24,7 @@ Scopeable = SnocList
 |||    Γ    ⊢ λx. t : A → B
 public export
 0 Scope : Type
-Scope = Scopeable Name
+Scope = Scopeable VarName
 
 namespace Scope
   public export
@@ -52,11 +52,6 @@ Scoped = Scope -> Type
 export %inline %deprecate
 scopeEq : (sx, sy : Scope) -> Maybe0 (sx = sy)
 scopeEq = hdecEq
-
-export
-mkFresh : Scope -> Name -> Name
-mkFresh vs n =
-  if n `elem` vs then assert_total $ mkFresh vs (next n) else n
 
 --------------------------------------------------------------------------------
 -- Compatible variables
