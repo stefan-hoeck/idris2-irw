@@ -20,5 +20,6 @@ modules = IRW.Algebra
         , IRW.Core.TT.Term.Subst
         , IRW.Core.TT.Var
         , IRW.Core.TT.VarSet
+        , IRW.Core.Value
 
 sourcedir = "src"
