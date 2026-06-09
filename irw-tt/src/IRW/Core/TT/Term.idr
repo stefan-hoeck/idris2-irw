@@ -81,25 +81,26 @@ Interpolation a => Interpolation (WhyErased a) where
 
 %name WhyErased why
 
-export %tcinline
-mapWhy : (a -> b) -> WhyErased a -> WhyErased b
-mapWhy f Placeholder = Placeholder
-mapWhy f Impossible = Impossible
-mapWhy f (Dotted x) = Dotted (f x)
+export
+Foldable1 WhyErased where
+  foldl1 f v (Dotted x) t = f v x t
+  foldl1 f v _ t = v # t
 
-export %inline
-Functor WhyErased where map = mapWhy
+export
+Traversable1 WhyErased where
+  traverse1 f Placeholder t = Placeholder # t
+  traverse1 f Impossible t = Impossible # t
+  traverse1 f (Dotted x) t = let y # t := f x t in Dotted y # t
+
+export
+Functor WhyErased where
+  map f p = run1 $ traverse1 (\x,t => f x # t) p
 
 export
 Foldable WhyErased where
-  foldr c n (Dotted x) = c x n
-  foldr c n _ = n
-
-export
-Traversable WhyErased where
-  traverse f Placeholder = pure Placeholder
-  traverse f Impossible = pure Impossible
-  traverse f (Dotted x) = Dotted <$> f x
+  foldr f acc p = run1 $ foldr1 (\x,y,t => f x y # t) acc p
+  foldl f acc p = run1 $ foldl1 (\x,y,t => f x y # t) acc p
+  foldMap f p = run1 $ foldMap1 (\x,t => f x # t) p
 
 --------------------------------------------------------------------------------
 -- Core Terms
@@ -136,17 +137,93 @@ data Term : (n : Type) -> Scope -> Type where
 %name Term t, u
 
 public export
-<<<<<<< HEAD
 0 FTerm : Scoped
 FTerm = Term FullName
 
 public export
 0 ClosedTerm : Type
 ClosedTerm = Term FullName [<]
-=======
-0 ClosedTerm : Type
-ClosedTerm = Term [<]
->>>>>>> 277177e ([ wip ] more on name resolution)
+
+public export
+record NTerm (sc : Scope) (n : Type) where
+  constructor NT
+  term : Term n sc
+
+covering
+foldT : (a -> n -> F1 s a) -> a -> Term n vs -> F1 s a
+foldT f x (Local fc isLet y) t = x # t
+foldT f x (Ref fc nt name) t = f x name t
+foldT f x (Meta fc y ts) t = Traverse1.foldl1 (foldT f) x ts t
+foldT f x (Bind fc y b scope) t =
+ let x2 # t := Traverse1.foldl1 (foldT f) x b t in foldT f x2 scope t
+foldT f x (App fc fn arg) t =
+ let x2 # t := foldT f x fn t in foldT f x2 arg t
+foldT f x (As fc side as pat) t =
+ let x2 # t := foldT f x as t in foldT f x2 pat t
+foldT f x (TDelayed fc lz u) t = foldT f x u t
+foldT f x (TDelay fc lz ty arg) t =
+ let x2 # t := foldT f x ty t in foldT f x2 arg t
+foldT f x (TForce fc lz u) t = foldT f x u t
+foldT f x (PrimVal fc c) t = x # t
+foldT f x (Erased fc why) t = foldl1 (foldT f) x why t
+foldT f x (TType fc y) t = x # t
+
+covering
+travT : (a -> F1 s b) -> Term a vs -> F1 s (Term b vs)
+travT f (Local fc isLet y) t = Local fc isLet y # t
+travT f (Ref fc nt name) t =
+ let n2 # t := f name t
+  in Ref fc nt n2 # t
+travT f (Meta fc y ts) t =
+ let ts2 # t := traverse1 (travT f) ts t
+  in Meta fc y ts2 # t
+travT f (Bind fc y b scope) t =
+ let b2 # t := traverse1 (travT f) b t
+     s2 # t := travT f scope t
+  in Bind fc y b2 s2 # t
+travT f (App fc fn arg) t =
+ let f2 # t := travT f fn t
+     a2 # t := travT f arg t
+  in App fc f2 a2 # t
+travT f (As fc side as pat) t =
+ let a2 # t := travT f as t
+     p2 # t := travT f pat t
+  in As fc side a2 p2 # t
+travT f (TDelayed fc lz u) t =
+ let u2 # t := travT f u t
+  in TDelayed fc lz u2 # t
+travT f (TDelay fc lz ty arg) t =
+ let t2 # t := travT f ty t
+     a2 # t := travT f arg t
+  in TDelay fc lz t2 a2 # t
+travT f (TForce fc lz u) t =
+ let u2 # t := travT f u t
+  in TForce fc lz u2 # t
+travT f (PrimVal fc c) t = PrimVal fc c # t
+travT f (Erased fc why) t =
+ let w2 # t := traverse1 (travT f) why t
+  in Erased fc w2 # t
+travT f (TType fc y) t = TType fc y # t
+
+export
+Foldable1 (NTerm vs) where
+  foldl1 f v (NT tt) t = assert_total $ foldT f v tt t
+
+export
+Traversable1 (NTerm vs) where
+  traverse1 f (NT tt) t =
+   let t2 # t := assert_total $ travT f tt t
+    in NT t2 # t
+
+export
+Functor (NTerm vs) where
+  map f p = run1 $ traverse1 (\x,t => f x # t) p
+
+export
+Foldable (NTerm vs) where
+  foldr f acc p = run1 $ foldr1 (\x,y,t => f x y # t) acc p
+  foldl f acc p = run1 $ foldl1 (\x,y,t => f x y # t) acc p
+  foldMap f p = run1 $ foldMap1 (\x,t => f x # t) p
 
 --------------------------------------------------------------------------------
 -- Weakening

@@ -1,8 +1,8 @@
 module IRW.Core.HasNames
 
-import Data.Linear.Traverse1
-import public IRW.Core.Name
 import public Data.Linear.Token
+import public Data.Linear.Traverse1
+import public IRW.Core.Name
 
 %default total
 
@@ -16,5 +16,13 @@ import public Data.Linear.Token
 public export
 interface Names (0 s : Type) where
   constructor MkNames
-  fullName : Bits32 -> F1 s (Maybe FullName)
+  fullName : Bits32 -> F1 s FullName
   register : FullName -> F1 s Bits32
+
+export %inline
+resolveNames : Traversable1 f => Names s => f Bits32 -> F1 s (f FullName)
+resolveNames = traverse1 fullName
+
+export %inline
+registerNames : Traversable1 f => Names s => f FullName -> F1 s (f Bits32)
+registerNames = traverse1 register
