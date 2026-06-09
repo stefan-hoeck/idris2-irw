@@ -6,6 +6,7 @@ import IRW.Algebra
 import IRW.Core.FC
 
 import IRW.Core.Name.Scoped
+import IRW.Core.HasNames
 import IRW.Core.TT.Binder
 import IRW.Core.TT.Primitive
 import IRW.Core.TT.Var
@@ -135,12 +136,17 @@ data Term : (n : Type) -> Scope -> Type where
 %name Term t, u
 
 public export
+<<<<<<< HEAD
 0 FTerm : Scoped
 FTerm = Term FullName
 
 public export
 0 ClosedTerm : Type
 ClosedTerm = Term FullName [<]
+=======
+0 ClosedTerm : Type
+ClosedTerm = Term [<]
+>>>>>>> 277177e ([ wip ] more on name resolution)
 
 --------------------------------------------------------------------------------
 -- Weakening

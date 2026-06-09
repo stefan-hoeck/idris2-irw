@@ -3,10 +3,12 @@ module IRW.Core.TT.Binder
 import Derive.Prelude
 import IRW.Algebra
 import IRW.Core.FC
+import IRW.Core.HasNames
 
 %default total
 %language ElabReflection
 %hide Language.Reflection.TT.FC
+%hide Language.Reflection.TT.Name
 %hide Language.Reflection.TT.PiInfo
 
 --------------------------------------------------------------------------------
@@ -31,6 +33,14 @@ data PiInfo t =
 
 %runElab derive "PiInfo" [Show]
 %name PiInfo pinfo
+
+export
+HasNames t => HasNames (PiInfo t) where
+  onNames f Implicit t        = Implicit # t
+  onNames f Explicit t        = Explicit # t
+  onNames f AutoImplicit t    = AutoImplicit # t
+  onNames f (DefImplicit x) t =
+    let x2 # t := onNames f x t in DefImplicit x2 # t
 
 namespace PiInfo
 
@@ -95,6 +105,13 @@ mapType f = {boundType $= f}
 export
 Interpolation t => Interpolation (PiBindData t) where
   interpolate (MkPiBindData i t) = "\{i}, \{t}"
+
+export
+HasNames t => HasNames (PiBindData t) where
+  onNames f (MkPiBindData i b) t =
+   let i2 # t := onNames f i t
+       b2 # t := onNames f b t
+    in MkPiBindData i2 b2 # t
 
 --------------------------------------------------------------------------------
 -- Different types of binders we may encounter
@@ -277,3 +294,29 @@ eqBinderBy eqTU = go where
 export
 Eq a => Eq (Binder a) where
   (==) = eqBinderBy (==)
+
+export
+HasNames t => HasNames (Binder t) where
+  onNames f (Lam fc rig p ty) t =
+   let p2 # t := onNames f p t
+       t2 # t := onNames f ty t
+    in Lam fc rig p2 t2 # t
+  onNames f (Let fc rig val ty) t =
+   let v2 # t := onNames f val t
+       t2 # t := onNames f ty t
+    in Let fc rig v2 t2 # t
+  onNames f (Pi fc rig p ty) t =
+   let p2 # t := onNames f p t
+       t2 # t := onNames f ty t
+    in Pi fc rig p2 t2 # t
+  onNames f (PVar fc rig p ty) t =
+   let p2 # t := onNames f p t
+       t2 # t := onNames f ty t
+    in PVar fc rig p2 t2 # t
+  onNames f (PLet fc rig v ty) t =
+   let v2 # t := onNames f v t
+       t2 # t := onNames f ty t
+    in PLet fc rig v2 t2 # t
+  onNames f (PVTy fc rig ty) t =
+   let t2 # t := onNames f ty t
+    in PVTy fc rig t2 # t

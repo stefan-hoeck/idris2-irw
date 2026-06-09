@@ -6,9 +6,10 @@ depends = base
         , irw-libs
 
 modules =
-          IRW.Core.Name
+          IRW.Core.FC
+        , IRW.Core.HasNames
+        , IRW.Core.Name
         , IRW.Core.Name.Namespace
         , IRW.Core.Name.Scoped
-        , IRW.Core.FC
 
 sourcedir = "src"
