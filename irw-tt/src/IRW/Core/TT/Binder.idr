@@ -3,10 +3,12 @@ module IRW.Core.TT.Binder
 import Derive.Prelude
 import IRW.Algebra
 import IRW.Core.FC
+import IRW.Core.HasNames
 
 %default total
 %language ElabReflection
 %hide Language.Reflection.TT.FC
+%hide Language.Reflection.TT.Name
 %hide Language.Reflection.TT.PiInfo
 
 --------------------------------------------------------------------------------
@@ -73,6 +75,18 @@ export
 Eq t => Eq (PiInfo t) where
   (==) = eqPiInfoBy (==)
 
+export
+Foldable1 PiInfo where
+  foldl1 f v (DefImplicit x) t = f v x t
+  foldl1 f v _ t = v # t
+
+export
+Traversable1 PiInfo where
+  traverse1 f Implicit t = Implicit # t
+  traverse1 f Explicit t = Explicit # t
+  traverse1 f AutoImplicit t = AutoImplicit # t
+  traverse1 f (DefImplicit x) t = let y # t := f x t in DefImplicit y # t
+
 --------------------------------------------------------------------------------
 -- A bound value
 --------------------------------------------------------------------------------
@@ -95,6 +109,18 @@ mapType f = {boundType $= f}
 export
 Interpolation t => Interpolation (PiBindData t) where
   interpolate (MkPiBindData i t) = "\{i}, \{t}"
+
+export
+Foldable1 PiBindData where
+  foldl1 f v (MkPiBindData i b) t =
+   let v2 # t := Traverse1.foldl1 f v i t in f v2 b t
+
+export
+Traversable1 PiBindData where
+  traverse1 f (MkPiBindData i b) t =
+   let i2 # t := traverse1 f i t
+       b2 # t := f b t
+    in MkPiBindData i2 b2 # t
 
 --------------------------------------------------------------------------------
 -- Different types of binders we may encounter
@@ -203,24 +229,13 @@ setType (PVTy fc c _) ty = PVTy fc c ty
 
 export
 Functor PiInfo where
-  map func Explicit = Explicit
-  map func Implicit = Implicit
-  map func AutoImplicit = AutoImplicit
-  map func (DefImplicit t) = (DefImplicit (func t))
+  map f p = run1 $ traverse1 (\x,t => f x # t) p
 
 export
 Foldable PiInfo where
-  foldr f acc Implicit = acc
-  foldr f acc Explicit = acc
-  foldr f acc AutoImplicit = acc
-  foldr f acc (DefImplicit x) = f x acc
-
-export
-Traversable PiInfo where
-  traverse f Implicit = pure Implicit
-  traverse f Explicit = pure Explicit
-  traverse f AutoImplicit = pure AutoImplicit
-  traverse f (DefImplicit x) = map DefImplicit (f x)
+  foldr f acc p = run1 $ foldr1 (\x,y,t => f x y # t) acc p
+  foldl f acc p = run1 $ foldl1 (\x,y,t => f x y # t) acc p
+  foldMap f p = run1 $ foldMap1 (\x,t => f x # t) p
 
 export
 Functor PiBindData where
@@ -229,37 +244,58 @@ Functor PiBindData where
 export
 Foldable PiBindData where
   foldr f acc (MkPiBindData info type) = f type (foldr f acc info)
+  foldl f acc p = run1 $ foldl1 (\x,y,t => f x y # t) acc p
+  foldMap f p = run1 $ foldMap1 (\x,t => f x # t) p
 
 export
-Traversable PiBindData where
-  traverse f (MkPiBindData info type) = MkPiBindData <$> traverse f info <*> f type
+Foldable1 Binder where
+  foldl1 f v (Lam _ _ p ty) t =
+   let v2 # t := Traverse1.foldl1 f v p t in f v2 ty t
+  foldl1 f v (Let _ _ p ty) t =
+   let v2 # t := f v p t in f v2 ty t
+  foldl1 f v (Pi _ _ p ty) t =
+   let v2 # t := Traverse1.foldl1 f v p t in f v2 ty t
+  foldl1 f v (PVar _ _ p ty) t =
+   let v2 # t := Traverse1.foldl1 f v p t in f v2 ty t
+  foldl1 f v (PLet _ _ p ty) t =
+   let v2 # t := f v p t in f v2 ty t
+  foldl1 f v (PVTy _ _ ty) t = f v ty t
+
+export
+Traversable1 Binder where
+  traverse1 f (Lam fc r p ty) t =
+   let p2 # t := Traverse1.traverse1 f p t
+       t2 # t :=  f ty t
+    in Lam fc r p2 t2 # t
+  traverse1 f (Let fc r p ty) t =
+   let p2 # t := f p t
+       t2 # t := f ty t
+    in Let fc r p2 t2 # t
+  traverse1 f (Pi fc r p ty) t =
+   let p2 # t := Traverse1.traverse1 f p t
+       t2 # t :=  f ty t
+    in Pi fc r p2 t2 # t
+  traverse1 f (PVar fc r p ty) t =
+   let p2 # t := Traverse1.traverse1 f p t
+       t2 # t :=  f ty t
+    in PVar fc r p2 t2 # t
+  traverse1 f (PLet fc r p ty) t =
+   let p2 # t := f p t
+       t2 # t := f ty t
+    in PLet fc r p2 t2 # t
+  traverse1 f (PVTy fc r ty) t =
+   let t2 # t := f ty t
+    in PVTy fc r t2 # t
 
 export
 Functor Binder where
-  map func (Lam fc c x ty) = Lam fc c (map func x) (func ty)
-  map func (Let fc c val ty) = Let fc c (func val) (func ty)
-  map func (Pi fc c x ty) = Pi fc c (map func x) (func ty)
-  map func (PVar fc c p ty) = PVar fc c (map func p) (func ty)
-  map func (PLet fc c val ty) = PLet fc c (func val) (func ty)
-  map func (PVTy fc c ty) = PVTy fc c (func ty)
+  map f p = run1 $ traverse1 (\x,t => f x # t) p
 
 export
 Foldable Binder where
-  foldr f acc (Lam fc c x ty) = foldr f (f ty acc) x
-  foldr f acc (Let fc c val ty) = f val (f ty acc)
-  foldr f acc (Pi fc c x ty) = foldr f (f ty acc) x
-  foldr f acc (PVar fc c p ty) = foldr f (f ty acc) p
-  foldr f acc (PLet fc c val ty) = f val (f ty acc)
-  foldr f acc (PVTy fc c ty) = f ty acc
-
-export
-Traversable Binder where
-  traverse f (Lam fc c x ty) = Lam fc c <$> traverse f x <*> f ty
-  traverse f (Let fc c val ty) = Let fc c <$> f val <*> f ty
-  traverse f (Pi fc c x ty) = Pi fc c <$> traverse f x <*> f ty
-  traverse f (PVar fc c p ty) = PVar fc c <$> traverse f p <*> f ty
-  traverse f (PLet fc c val ty) = PLet fc c <$> f val <*> f ty
-  traverse f (PVTy fc c ty) = PVTy fc c <$> f ty
+  foldr f acc p = run1 $ foldr1 (\x,y,t => f x y # t) acc p
+  foldl f acc p = run1 $ foldl1 (\x,y,t => f x y # t) acc p
+  foldMap f p = run1 $ foldMap1 (\x,t => f x # t) p
 
 export
 eqBinderBy : (t -> u -> Bool) -> (Binder t -> Binder u -> Bool)
