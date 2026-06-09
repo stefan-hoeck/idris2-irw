@@ -465,69 +465,6 @@ export %inline
 getArgs : Term n vs -> List (Term n vs)
 getArgs = snd . getFnArgs
 
---------------------------------------------------------------------------------
--- Namespace manipulations
---------------------------------------------------------------------------------
-
-||| Remove/restore the given namespace from all Refs. This is to allow
-||| writing terms and case trees to disk without repeating the same namespace
-||| all over the place.
-public export
-interface StripNamespace a where
-  trimNS : Namespace -> a -> a
-  restoreNS : Namespace -> a -> a
-
-export
-StripNamespace FullName where
-  trimNS ns nm@(FN (Just tns) n) = if ns == tns then FN (Just emptyNS) n else nm
-  trimNS ns nm                   = nm
-
-  restoreNS ns nm@(FN (Just tns) n) =
-    case tns.names of
-      [<] => FN (Just ns) n
-      _   => nm
-  restoreNS ns nm = nm
-
-adjL : (FullName -> FullName) -> List (FTerm vs) -> List (FTerm vs)
-
-adjB : (FullName -> FullName) -> Binder (FTerm vs) -> Binder (FTerm vs)
-
-adjW : (FullName -> FullName) -> WhyErased (FTerm vs) -> WhyErased (FTerm vs)
-
-adjP : (FullName -> FullName) -> PiInfo (FTerm vs) -> PiInfo (FTerm vs)
-
-adjT : (FullName -> FullName) -> FTerm vs -> FTerm vs
-adjT f (Ref fc nt name)    = Ref fc nt (f name)
-adjT f (Meta fc n ts)      = Meta fc n $ adjL f ts
-adjT f (Bind fc x b sc)    = Bind fc x  (adjB f b) (adjT f sc)
-adjT f (App fc fn x)       = App fc (adjT f fn) (adjT f x)
-adjT f (As fc s as pat)    = As fc s (adjT f as) (adjT f pat)
-adjT f (TDelayed fc lz t)  = TDelayed fc lz $ adjT f t
-adjT f (TDelay fc lz ty x) = TDelay fc lz (adjT f ty) (adjT f x)
-adjT f (TForce fc lz t)    = TForce fc lz $ adjT f t
-adjT f x                   = x
-
-adjL f []      = []
-adjL f (t::ts) = adjT f t :: adjL f ts
-
-adjW f (Dotted x) = Dotted $ adjT f x
-adjW f x          = x
-
-adjP f (DefImplicit x) = DefImplicit $ adjT f x
-adjP f x               = x
-
-adjB f (Lam fc r p t)  = Lam fc r  (adjP f p) (adjT f t)
-adjB f (Let fc r v t)  = Let fc r  (adjT f v) (adjT f t)
-adjB f (Pi fc r p t)   = Pi fc r   (adjP f p) (adjT f t)
-adjB f (PVar fc r p t) = PVar fc r (adjP f p) (adjT f t)
-adjB f (PLet fc r v t) = PLet fc r (adjT f v) (adjT f t)
-adjB f (PVTy fc r t)   = PVTy fc r (adjT f t)
-
-export %inline
-StripNamespace (FTerm vs) where
-  trimNS = adjT . trimNS
-  restoreNS = adjT . restoreNS
-
 export
 isErased : FTerm vs -> Bool
 isErased (Erased {}) = True
